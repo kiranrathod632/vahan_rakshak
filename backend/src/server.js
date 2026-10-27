@@ -10,8 +10,10 @@ const { initSocket } = require('./config/socket');
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to Database
-connectDB();
+// Connect to Database (handles startup connection gracefully so server stays running)
+connectDB().catch((err) => {
+  console.log('⏳ Waiting for MongoDB Atlas connection... The server will automatically connect as soon as Atlas IP whitelist is active.');
+});
 
 // Create HTTP server
 const server = http.createServer(app);

@@ -95,7 +95,8 @@ app.use('/scan', scanLimiter, scanRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/alerts', alertRoutes);
 
-// Admin Dashboard Routes
+// Admin Dashboard & Scanners Routes
+app.use('/api/scanners', adminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/admin', (req, res, next) => {
   if (req.headers['x-admin-key'] || req.headers.authorization || (!req.accepts('html') && req.path !== '/')) {

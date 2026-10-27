@@ -12,7 +12,10 @@ import {
   CheckCircle2,
   RefreshCw,
   Copy,
-  Check
+  Check,
+  Radio,
+  Shield,
+  Phone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -133,58 +136,97 @@ export default function Scanners() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Active QR Sticker Showcase Card */}
-        <div className="card p-6 flex flex-col items-center text-center space-y-4">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 text-xs font-semibold border border-brand-200 dark:border-brand-900/60">
-            <Sparkles className="size-3.5 text-amber-500" />
-            <span>Active Weatherproof Sticker</span>
-          </div>
-
-          <div className="p-4 bg-white rounded-2xl border-2 border-slate-900 shadow-xl">
-            <img
-              src={qrImageUrl}
-              alt="Vehicle QR"
-              className="size-48 rounded-xl object-contain mx-auto"
-            />
-            <div className="mt-3 font-mono font-black text-lg tracking-widest text-slate-950">
-              {activeCode}
+        {/* Active QR Sticker Showcase Card (Matches Physical Vehicle Sticker Layout) */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="card p-4 sm:p-5 flex flex-col items-center space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-cyan-400 text-xs font-semibold border border-brand-200 dark:border-brand-900/60">
+              <Sparkles className="size-3.5 text-amber-500" />
+              <span>Printable Vehicle QR Sticker</span>
             </div>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
-              GadiRaksha Smart Safety
-            </p>
-          </div>
 
-          <div className="flex gap-2 w-full pt-2">
+            {/* Official Physical Sticker Card Layout (Yellow + White Dual Card) */}
+            <div className="w-full bg-white rounded-2xl border-2 border-slate-900 shadow-xl overflow-hidden flex flex-col text-slate-900 font-sans">
+              {/* Top/Left Section */}
+              <div className="p-4 flex flex-col justify-between space-y-2 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xl font-black tracking-tight font-display text-slate-950">
+                    GADIRAKSHA<span className="text-amber-500">.IN</span>
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                    SMART TAG
+                  </span>
+                </div>
+                <h3 className="text-sm font-black leading-snug tracking-tight text-slate-950 font-display">
+                  Scan the code <br />
+                  <span className="underline decoration-amber-400 decoration-2 underline-offset-2">to contact the</span> vehicle owner.
+                </h3>
+              </div>
+
+              {/* Bottom/Right Yellow Accent Section with QR */}
+              <div className="bg-amber-400 p-3.5 flex flex-col items-center space-y-2">
+                <div className="bg-white p-2 rounded-xl border-2 border-slate-900 shadow-sm w-full max-w-[200px] flex flex-col items-center">
+                  <img
+                    src={qrImageUrl}
+                    alt="Vehicle QR"
+                    className="size-40 object-contain mx-auto"
+                  />
+                  <div className="flex items-center justify-between w-full mt-1 px-1 border-t border-slate-100 pt-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700">
+                      <Radio className="size-2.5 text-amber-600" /> NFC
+                    </span>
+                    <span className="font-mono font-black text-sm tracking-wider text-slate-950">
+                      {activeCode}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4 Emergency Icon Badges */}
+                <div className="w-full text-center space-y-1">
+                  <div className="flex items-center justify-center gap-2 text-slate-950 text-xs">
+                    <span title="Wrong Parking" className="p-1 rounded-full bg-white/70 font-bold">🚫</span>
+                    <span title="Emergency / SOS" className="p-1 rounded-full bg-white/70 font-bold">🆘</span>
+                    <span title="Caution / Towing" className="p-1 rounded-full bg-white/70 font-bold">⚠️</span>
+                    <span title="Direct Call" className="p-1 rounded-full bg-white/70 font-bold">📞</span>
+                  </div>
+                  <p className="text-[9px] font-extrabold text-slate-950 leading-tight">
+                    Wrong Parking • Emergency Contact • Scan QR
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 w-full pt-1">
+              <button
+                onClick={copyLink}
+                className="btn-secondary flex-1 !py-2 text-xs"
+              >
+                {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy Link'}</span>
+              </button>
+              <button
+                onClick={() => window.open(qrImageUrl, '_blank')}
+                className="btn-secondary !py-2 px-3 text-xs"
+                title="Download QR Image"
+              >
+                <Download className="size-3.5" />
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="btn-secondary !py-2 px-3 text-xs"
+                title="Print Sticker"
+              >
+                <Printer className="size-3.5" />
+              </button>
+            </div>
+
             <button
-              onClick={copyLink}
-              className="btn-secondary flex-1 !py-2 text-xs"
+              onClick={() => navigate(`/scan/${activeCode}`)}
+              className="btn-primary w-full text-xs font-bold"
             >
-              {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-              <span>{copied ? 'Copied!' : 'Copy Link'}</span>
-            </button>
-            <button
-              onClick={() => window.open(qrImageUrl, '_blank')}
-              className="btn-secondary !py-2 px-3 text-xs"
-              title="Download QR Image"
-            >
-              <Download className="size-3.5" />
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="btn-secondary !py-2 px-3 text-xs"
-              title="Print Sticker"
-            >
-              <Printer className="size-3.5" />
+              <ExternalLink className="size-4" />
+              <span>Open Bystander Scan Simulation</span>
             </button>
           </div>
-
-          <button
-            onClick={() => navigate(`/scan/${activeCode}`)}
-            className="btn-primary w-full text-xs font-bold"
-          >
-            <ExternalLink className="size-4" />
-            <span>Open Bystander Scan Simulation</span>
-          </button>
         </div>
 
         {/* Physical Sticker Configuration Card */}

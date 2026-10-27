@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://vahan-rakshak-v4oe.vercel.app/api/$1"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "https://vahan-rakshak-v4oe.vercel.app/auth/$1"
+    },
+    {
+      "source": "/tags/(.*)",
+      "destination": "https://vahan-rakshak-v4oe.vercel.app/tags/$1"
+    },
+    {
+      "source": "/alerts/(.*)",
+      "destination": "https://vahan-rakshak-v4oe.vercel.app/alerts/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 dark:bg-[#0b0d14] text-slate-800 dark:text-slate-100 font-sans antialiased transition-colors duration-200;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight text-ink dark:text-white;
+  }
+}
+
+.text-ink {
+  color: #0b1220;
+}
+.dark .text-ink {
+  color: #ffffff !important;
+}
+
+/* Custom UI Classes matching vehicle-qr-scanner design with dark theme support */
+.card {
+  @apply bg-white dark:bg-[#12141e] border border-slate-200/90 dark:border-[#1f2333] rounded-2xl shadow-sm hover:shadow transition-all duration-200 dark:text-slate-100;
+}
+
+.input {
+  @apply rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-brand-500 focus:outline-none transition;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/20 hover:bg-brand-700 active:scale-[0.98] transition disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-[#222533] bg-white dark:bg-[#151722] px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1a1c2c] hover:border-slate-300 active:scale-[0.98] transition disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#141622] hover:text-ink dark:hover:text-white px-3 py-2 text-sm font-medium transition;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-rose-500/20 hover:bg-rose-700 active:scale-[0.98] transition disabled:opacity-50 disabled:pointer-events-none;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.6); }
+  70% { transform: scale(1); box-shadow: 0 0 0 14px rgba(225, 29, 72, 0); }
+  100% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+}
+
+.pulse-sos {
+  animation: pulse-ring 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}

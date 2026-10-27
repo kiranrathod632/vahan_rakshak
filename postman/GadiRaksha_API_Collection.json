@@ -1,0 +1,338 @@
+{
+  "info": {
+    "_postman_id": "7f8b91a2-3c4d-5e6f-a7b8-c9d0e1f2a3b4",
+    "name": "GadiRaksha Smart Vehicle Safety API",
+    "description": "Comprehensive Postman Collection for GadiRaksha Smart Vehicle QR Emergency & No-Parking Alert System with Admin & Sales Portals.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User (with Sticker Code)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ramesh Sharma\",\n  \"mobileNumber\": \"9876543210\",\n  \"password\": \"password123\",\n  \"vehicleNumber\": \"MH-12-AB-1234\",\n  \"vehicleType\": \"CAR\",\n  \"emergencyContact\": \"9876543211\",\n  \"emergencyName\": \"Pooja Sharma\",\n  \"physicalTagCode\": \"MH-1001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login User / Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobileNumber\": \"9823000000\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile (Me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stickers & Tags",
+      "item": [
+        {
+          "name": "Check Sticker Code Availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tags/check/MH-1001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags", "check", "MH-1001"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Tags (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Batch Physical Tags",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-admin-key", "value": "{{adminApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 10,\n  \"prefix\": \"MH\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tags/generate-batch",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags", "generate-batch"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Public QR Scan & Emergency Actions",
+      "item": [
+        {
+          "name": "Public Scan Vehicle QR Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/scan/MH-1001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "scan", "MH-1001"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Dispatch Alert (No-Parking / Accident SOS)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagCode\": \"MH-1001\",\n  \"alertType\": \"NO_PARKING\",\n  \"reporterPhone\": \"9811223344\",\n  \"reporterMessage\": \"Car is blocking residential gate.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Alerts History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/alerts/my-alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alerts", "my-alerts"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sales Team Portal",
+      "item": [
+        {
+          "name": "Sales Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobileNumber\": \"9821889900\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sales", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sales Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{salesToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/my-stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sales", "my-stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sales Customer List",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{salesToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/my-customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sales", "my-customers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Salesman Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{salesToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vikram Deshmukh\",\n  \"mobileNumber\": \"9899001122\",\n  \"vehicleNumber\": \"MH-12-ZZ-9999\",\n  \"vehicleType\": \"CAR\",\n  \"emergencyContact\": \"9899001123\",\n  \"emergencyName\": \"Kavita Deshmukh\",\n  \"tagCode\": \"MH-1002\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/register-customer",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sales", "register-customer"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sales Attendance Clock In",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{salesToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"location\": \"Pune Central Outlet\",\n  \"notes\": \"Started morning field duty\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sales/attendance/clock-in",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sales", "attendance", "clock-in"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Portal",
+      "item": [
+        {
+          "name": "Get Admin Overview Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sales Staff List",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/sales-staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "sales-staff"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Sales Staff Incentive & Base Salary",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commissionPerSale\": 75,\n  \"baseSalary\": 18000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/sales-staff/671d0e1234567890abcdef12/incentive",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "sales-staff", "671d0e1234567890abcdef12", "incentive"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record Staff Salary Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": \"October 2026\",\n  \"amountPaid\": 20500,\n  \"paymentMethod\": \"BANK_TRANSFER\",\n  \"transactionRef\": \"NEFT9823471029\",\n  \"remarks\": \"Salary + 50 sticker incentives paid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/sales-staff/671d0e1234567890abcdef12/salary-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "sales-staff", "671d0e1234567890abcdef12", "salary-payment"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

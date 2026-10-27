@@ -1,0 +1,31 @@
+{
+  "id": "e9a12c8b-5634-4bc1-9988-821f92e3a1b0",
+  "name": "GadiRaksha Local Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "salesToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "adminApiKey",
+      "value": "gadiraksha_admin_secret_batch_gen_key_2026",
+      "type": "secret",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

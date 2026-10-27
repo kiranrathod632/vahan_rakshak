@@ -1,0 +1,37 @@
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+
+# Vercel deployment cache
+.vercel/
+!.vercel/project.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

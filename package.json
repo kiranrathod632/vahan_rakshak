@@ -10,8 +10,8 @@
     "backend:dev": "node backend/src/server.js",
     "frontend": "npm --prefix frontend run dev",
     "frontend:dev": "npm --prefix frontend run dev",
-    "frontend:build": "npm --prefix frontend run build",
-    "build": "npm --prefix frontend run build",
+    "frontend:build": "npm --prefix frontend run build && node -e \"const fs=require('fs'); fs.cpSync('frontend/dist', 'backend/public', {recursive:true});\"",
+    "build": "npm --prefix frontend run build && node -e \"const fs=require('fs'); fs.cpSync('frontend/dist', 'backend/public', {recursive:true});\"",
     "client:dev": "npm --prefix frontend run dev",
     "seed": "node backend/scripts/seedDemoSales.js",
     "check-admin": "node backend/scripts/checkAdmin.js"

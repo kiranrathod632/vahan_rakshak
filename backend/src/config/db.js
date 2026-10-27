@@ -3,7 +3,7 @@ const dns = require('dns');
 
 // Configure DNS resolvers for reliable MongoDB Atlas SRV connection on Windows
 try {
-  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1','0.0.0.0']);
 } catch (e) {
   // Fallback to system default if not supported
 }

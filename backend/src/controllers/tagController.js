@@ -483,6 +483,175 @@ const getMyTags = async (req, res, next) => {
 };
 
 /**
+ * @desc    Buy new QR scanner(s) (Authenticated User)
+ * @route   POST /api/tags/buy or POST /api/tags/purchase
+ * @access  Private
+ */
+const buyScanner = async (req, res, next) => {
+  try {
+    const {
+      plan = '1_YEAR_STANDARD',
+      quantity = 1,
+      prefix = 'MH',
+      vehicleNumber,
+      vehicleType,
+      vehicleModel,
+      vehicleColor,
+      deliveryAddress,
+      paymentMode = 'UPI'
+    } = req.body;
+
+    const count = Math.min(Math.max(1, Number(quantity) || 1), 10);
+    const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+    const cleanPrefix = (prefix || 'MH').toUpperCase().trim();
+
+    // Determine plan pricing
+    let pricePerSticker = 299;
+    let planName = '1_YEAR_STANDARD';
+    let validityDays = 365;
+
+    if (plan === 'family' || plan === 'FAMILY_PACK') {
+      planName = 'FAMILY_PACK';
+      pricePerSticker = 233; // 699 for 3 stickers (~233 each)
+    } else if (plan === 'pro_3yr' || plan === '3_YEAR_PRO') {
+      planName = '3_YEAR_PRO';
+      pricePerSticker = 699;
+      validityDays = 365 * 3;
+    } else if (plan === 'lifetime' || plan === 'LIFETIME') {
+      planName = 'LIFETIME';
+      pricePerSticker = 999;
+      validityDays = 365 * 10;
+    }
+
+    const totalAmount = pricePerSticker * count;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // If delivery address provided, update user address
+    if (deliveryAddress && String(deliveryAddress).trim()) {
+      if (typeof user.address === 'object' && user.address !== null) {
+        user.address.fullAddress = String(deliveryAddress).trim();
+      } else {
+        user.address = { fullAddress: String(deliveryAddress).trim() };
+      }
+      await user.save();
+    }
+
+    // Check if user has an existing vehicle or wants to link this one
+    let targetVehicle = null;
+    if (vehicleNumber && String(vehicleNumber).trim()) {
+      const cleanVNum = String(vehicleNumber).toUpperCase().trim().replace(/\s+/g, ' ');
+      targetVehicle = await Vehicle.findOne({ user: user._id, vehicleNumber: cleanVNum });
+      if (!targetVehicle) {
+        targetVehicle = await Vehicle.create({
+          user: user._id,
+          vehicleNumber: cleanVNum,
+          vehicleType: vehicleType || 'Two-Wheeler',
+          vehicleModel: vehicleModel || '',
+          vehicleColor: vehicleColor || '',
+          isPrimary: !user.primaryVehicle
+        });
+        user.vehicles.push(targetVehicle._id);
+        if (!user.primaryVehicle) {
+          user.primaryVehicle = targetVehicle._id;
+        }
+        await user.save();
+      }
+    }
+
+    const purchasedTags = [];
+    const transactionId = `TXN-GR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    for (let i = 0; i < count; i++) {
+      let unique = false;
+      let candidateCode = '';
+
+      // Auto-increment from next available sequential number
+      const lastTag = await Tag.findOne({ tagCode: new RegExp(`^${cleanPrefix}-\\d+$`) })
+        .sort({ createdAt: -1 });
+      let nextNum = 1001;
+      if (lastTag && lastTag.tagCode) {
+        const match = lastTag.tagCode.match(/-(\d+)$/);
+        if (match) nextNum = Number(match[1]) + 1 + i;
+      } else {
+        nextNum = 1001 + i;
+      }
+
+      while (!unique) {
+        candidateCode = `${cleanPrefix}-${nextNum}`;
+        const existing = await Tag.findOne({ tagCode: candidateCode });
+        if (!existing) {
+          unique = true;
+        } else {
+          nextNum++;
+        }
+      }
+
+      const scanUrl = `${clientBaseUrl}/scan/${candidateCode}`;
+      const qrDataUrl = await QRCode.toDataURL(scanUrl, {
+        errorCorrectionLevel: 'H',
+        margin: 2,
+        width: 350,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+
+      const vehicleToLink = (i === 0 && targetVehicle) ? targetVehicle : null;
+
+      const newTag = await Tag.create({
+        tagCode: candidateCode,
+        qrUrl: scanUrl,
+        qrImageBase64: qrDataUrl,
+        status: 'ACTIVE',
+        user: user._id,
+        vehicle: vehicleToLink ? vehicleToLink._id : null,
+        vehicleDetails: {
+          vehicleNumber: vehicleToLink ? vehicleToLink.vehicleNumber : (vehicleNumber ? String(vehicleNumber).toUpperCase().trim() : ''),
+          vehicleType: vehicleToLink ? vehicleToLink.vehicleType : (vehicleType || 'Two-Wheeler'),
+          vehicleModel: vehicleToLink ? vehicleToLink.vehicleModel : (vehicleModel || ''),
+          vehicleColor: vehicleToLink ? vehicleToLink.vehicleColor : (vehicleColor || '')
+        },
+        claimedAt: new Date(),
+        purchaseInfo: {
+          isPaid: true,
+          paymentStatus: 'PAID',
+          plan: planName,
+          amountPaid: pricePerSticker,
+          purchasedAt: new Date(),
+          validUntil: new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000),
+          transactionId
+        }
+      });
+
+      if (vehicleToLink) {
+        vehicleToLink.tag = newTag._id;
+        vehicleToLink.tagCode = newTag.tagCode;
+        await vehicleToLink.save();
+      }
+
+      purchasedTags.push(newTag);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `🎉 Success! Purchased and generated ${purchasedTags.length} GadiRaksha Smart QR Scanner(s)!`,
+      order: {
+        transactionId,
+        plan: planName,
+        totalAmount,
+        paymentMode,
+        stickerCount: purchasedTags.length,
+        deliveryAddress: deliveryAddress || user.address?.fullAddress || 'Registered Address'
+      },
+      data: purchasedTags
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Claim an existing tag (for logged in user)
  * @route   POST /api/tags/claim
  * @access  Private
@@ -647,5 +816,6 @@ module.exports = {
   updatePurchaseStatus,
   getMyTags,
   claimTag,
+  buyScanner,
   checkTagAvailability
 };

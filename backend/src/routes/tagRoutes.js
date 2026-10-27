@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   batchGenerateTags,
   claimTag,
+  buyScanner,
   registerAndClaim,
   getMyTags,
   updateVehicleDocuments,
@@ -20,6 +21,10 @@ router.post('/batch-generate', adminKeyAuth, batchGenerateTags);
 
 // Public 1-step register user + claim sticker + emergency contacts + docs
 router.post('/register-and-claim', registerAndClaim);
+
+// Buy fresh QR scanner(s) (Authenticated User)
+router.post('/buy', protect, buyScanner);
+router.post('/purchase', protect, buyScanner);
 
 // Protected routes for vehicle owner
 router.post('/claim', protect, claimTag);

@@ -40,6 +40,7 @@ router.get('/overview', getAdminStats);
 // 2. QR Scanners Management & Inventory
 router.get('/scanners', getAllScanners);
 router.put('/scanners/:tagCode/status', updateScannerStatus);
+router.post('/scanners/generate', batchGenerateScanners);
 router.post('/scanners/batch-generate', batchGenerateScanners);
 
 // 3. User Accounts & Demographics Management

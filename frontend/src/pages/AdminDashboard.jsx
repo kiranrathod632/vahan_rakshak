@@ -129,6 +129,8 @@ export default function AdminDashboard() {
 
   const [batchGenCount, setBatchGenCount] = useState(10);
   const [batchGenPrefix, setBatchGenPrefix] = useState('MH');
+  const [batchGenMode, setBatchGenMode] = useState('SEQUENTIAL');
+  const [batchGenStartNum, setBatchGenStartNum] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [genSuccessMsg, setGenSuccessMsg] = useState('');
 
@@ -753,13 +755,21 @@ export default function AdminDashboard() {
     setIsGenerating(true);
     setGenSuccessMsg('');
     try {
-      const res = await adminApiFetch('/api/admin/scanners/batch-generate', {
+      const payload = {
+        count: batchGenCount,
+        prefix: batchGenPrefix,
+        mode: batchGenMode
+      };
+      if (batchGenStartNum && !isNaN(Number(batchGenStartNum))) {
+        payload.startNumber = Number(batchGenStartNum);
+      }
+      const res = await adminApiFetch('/api/admin/scanners/generate', {
         method: 'POST',
-        body: JSON.stringify({ count: batchGenCount, prefix: batchGenPrefix })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
-        setGenSuccessMsg(`Generated ${data.count} printable pre-printed QR stickers!`);
+        setGenSuccessMsg(`Generated ${data.count} unique printable QR stickers (${data.prefix})!`);
         loadAllData();
       } else {
         alert(data.message || 'Generation failed');
@@ -1596,21 +1606,48 @@ export default function AdminDashboard() {
                   type="text"
                   value={batchGenPrefix}
                   onChange={(e) => setBatchGenPrefix(e.target.value.toUpperCase())}
-                  className="w-24 rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-mono font-bold uppercase text-ink dark:text-white"
+                  placeholder="e.g. MH"
+                  className="w-20 rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-mono font-bold uppercase text-ink dark:text-white"
                 />
               </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">ID Format</label>
+                <select
+                  value={batchGenMode}
+                  onChange={(e) => setBatchGenMode(e.target.value)}
+                  className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white font-semibold"
+                >
+                  <option value="SEQUENTIAL">Sequential (MH-1001, MH-1002...)</option>
+                  <option value="RANDOM">Random Unique (MH-84920...)</option>
+                </select>
+              </div>
+
+              {batchGenMode === 'SEQUENTIAL' && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Start # (Optional)</label>
+                  <input
+                    type="number"
+                    value={batchGenStartNum}
+                    onChange={(e) => setBatchGenStartNum(e.target.value)}
+                    placeholder="Auto (Next #)"
+                    className="w-28 rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-mono text-ink dark:text-white"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Quantity</label>
                 <select
                   value={batchGenCount}
                   onChange={(e) => setBatchGenCount(Number(e.target.value))}
-                  className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white"
+                  className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white font-semibold"
                 >
-                  <option value={5}>5 Stickers</option>
-                  <option value={10}>10 Stickers</option>
-                  <option value={25}>25 Stickers</option>
-                  <option value={50}>50 Stickers</option>
+                  <option value={5}>5 Unique Stickers</option>
+                  <option value={10}>10 Unique Stickers</option>
+                  <option value={25}>25 Unique Stickers</option>
+                  <option value={50}>50 Unique Stickers</option>
+                  <option value={100}>100 Unique Stickers</option>
                 </select>
               </div>
 
@@ -1621,7 +1658,7 @@ export default function AdminDashboard() {
                   className="btn-primary !py-2 !px-4 text-xs font-bold"
                 >
                   <RefreshCw className={`size-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                  <span>{isGenerating ? 'Generating...' : 'Generate Stickers Now'}</span>
+                  <span>{isGenerating ? 'Generating...' : 'Generate Scanners Now'}</span>
                 </button>
               </div>
             </form>

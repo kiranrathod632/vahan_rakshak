@@ -13,58 +13,160 @@ const generateToken = (id) => {
 };
 
 /**
- * @desc    Batch generate physical QR tags for printing stickers (Admin)
- * @route   POST /api/tags/batch-generate
+ * @desc    Generate one or multiple physical QR tags with unique IDs for printing stickers (Admin)
+ * @route   POST /api/tags/generate or POST /api/tags/batch-generate
  * @access  Private (Admin or Admin-Key)
  */
 const batchGenerateTags = async (req, res, next) => {
   try {
-    const { count = 10, prefix = 'GR' } = req.body;
+    const {
+      count = 10,
+      prefix = 'MH',
+      mode = 'SEQUENTIAL', // 'SEQUENTIAL' | 'RANDOM' | 'CUSTOM'
+      startNumber,
+      codes = []
+    } = req.body;
+
     const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
-
+    const cleanPrefix = (prefix || 'MH').toUpperCase().trim();
     const tagsCreated = [];
+    const skippedCodes = [];
 
-    for (let i = 0; i < Number(count); i++) {
-      let unique = false;
-      let tagCode = '';
+    // Mode 1: Custom predefined list of codes
+    if (Array.isArray(codes) && codes.length > 0) {
+      for (const rawCode of codes) {
+        if (!rawCode || !String(rawCode).trim()) continue;
+        const code = String(rawCode).trim().toUpperCase();
 
-      // Ensure uniqueness
-      while (!unique) {
-        const randomPart = Math.floor(10000 + Math.random() * 90000);
-        tagCode = `${prefix}-${randomPart}`;
-        const existing = await Tag.findOne({ tagCode });
-        if (!existing) unique = true;
+        const existing = await Tag.findOne({ tagCode: code });
+        if (existing) {
+          skippedCodes.push({ code, reason: `Already exists with status: ${existing.status}` });
+          continue;
+        }
+
+        const scanUrl = `${clientBaseUrl}/scan/${code}`;
+        const qrDataUrl = await QRCode.toDataURL(scanUrl, {
+          errorCorrectionLevel: 'H',
+          margin: 2,
+          width: 350,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+
+        const newTag = await Tag.create({
+          tagCode: code,
+          qrUrl: scanUrl,
+          qrImageBase64: qrDataUrl,
+          status: 'UNCLAIMED'
+        });
+
+        tagsCreated.push({
+          _id: newTag._id,
+          tagCode: newTag.tagCode,
+          qrUrl: newTag.qrUrl,
+          qrImageBase64: newTag.qrImageBase64,
+          status: newTag.status,
+          createdAt: newTag.createdAt
+        });
+      }
+    } else if (mode === 'SEQUENTIAL' || startNumber !== undefined) {
+      // Mode 2: Sequential numbering (e.g. MH-1001, MH-1002, ...)
+      let currentNum = Number(startNumber);
+      if (isNaN(currentNum) || currentNum < 1) {
+        const lastTag = await Tag.findOne({ tagCode: new RegExp(`^${cleanPrefix}-\\d+$`) })
+          .sort({ createdAt: -1 });
+        if (lastTag && lastTag.tagCode) {
+          const match = lastTag.tagCode.match(/-(\d+)$/);
+          currentNum = match ? Number(match[1]) + 1 : 1001;
+        } else {
+          currentNum = 1001;
+        }
       }
 
-      const scanUrl = `${clientBaseUrl}/scan/${tagCode}`;
-      const qrDataUrl = await QRCode.toDataURL(scanUrl, {
-        errorCorrectionLevel: 'H',
-        margin: 2,
-        width: 300,
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
+      const totalCount = Math.min(Math.max(1, Number(count) || 1), 500);
+
+      while (tagsCreated.length < totalCount) {
+        const candidateCode = `${cleanPrefix}-${currentNum}`;
+        currentNum++;
+
+        const existing = await Tag.findOne({ tagCode: candidateCode });
+        if (existing) {
+          continue;
         }
-      });
 
-      const newTag = await Tag.create({
-        tagCode,
-        qrUrl: scanUrl,
-        qrImageBase64: qrDataUrl,
-        status: 'UNCLAIMED'
-      });
+        const scanUrl = `${clientBaseUrl}/scan/${candidateCode}`;
+        const qrDataUrl = await QRCode.toDataURL(scanUrl, {
+          errorCorrectionLevel: 'H',
+          margin: 2,
+          width: 350,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
 
-      tagsCreated.push({
-        tagCode: newTag.tagCode,
-        qrUrl: newTag.qrUrl,
-        qrImageBase64: newTag.qrImageBase64
-      });
+        const newTag = await Tag.create({
+          tagCode: candidateCode,
+          qrUrl: scanUrl,
+          qrImageBase64: qrDataUrl,
+          status: 'UNCLAIMED'
+        });
+
+        tagsCreated.push({
+          _id: newTag._id,
+          tagCode: newTag.tagCode,
+          qrUrl: newTag.qrUrl,
+          qrImageBase64: newTag.qrImageBase64,
+          status: newTag.status,
+          createdAt: newTag.createdAt
+        });
+      }
+    } else {
+      // Mode 3: Random unique codes (e.g. MH-84920)
+      const totalCount = Math.min(Math.max(1, Number(count) || 1), 500);
+
+      for (let i = 0; i < totalCount; i++) {
+        let unique = false;
+        let tagCode = '';
+        let attempts = 0;
+
+        while (!unique && attempts < 100) {
+          attempts++;
+          const randomPart = Math.floor(10000 + Math.random() * 90000);
+          tagCode = `${cleanPrefix}-${randomPart}`;
+          const existing = await Tag.findOne({ tagCode });
+          if (!existing) unique = true;
+        }
+
+        const scanUrl = `${clientBaseUrl}/scan/${tagCode}`;
+        const qrDataUrl = await QRCode.toDataURL(scanUrl, {
+          errorCorrectionLevel: 'H',
+          margin: 2,
+          width: 350,
+          color: { dark: '#000000', light: '#ffffff' }
+        });
+
+        const newTag = await Tag.create({
+          tagCode,
+          qrUrl: scanUrl,
+          qrImageBase64: qrDataUrl,
+          status: 'UNCLAIMED'
+        });
+
+        tagsCreated.push({
+          _id: newTag._id,
+          tagCode: newTag.tagCode,
+          qrUrl: newTag.qrUrl,
+          qrImageBase64: newTag.qrImageBase64,
+          status: newTag.status,
+          createdAt: newTag.createdAt
+        });
+      }
     }
 
     res.status(201).json({
       success: true,
-      message: `Successfully generated ${tagsCreated.length} QR tags ready for printing`,
+      message: `Successfully generated ${tagsCreated.length} unique scanners ready for physical printing`,
       count: tagsCreated.length,
+      prefix: cleanPrefix,
+      skippedCount: skippedCodes.length,
+      skippedCodes: skippedCodes.length > 0 ? skippedCodes : undefined,
       data: tagsCreated
     });
   } catch (error) {

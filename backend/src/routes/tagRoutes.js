@@ -15,6 +15,7 @@ const { protect, adminKeyAuth } = require('../middlewares/authMiddleware');
 router.get('/check/:tagCode', checkTagAvailability);
 
 // Batch generate stickers for printing (Admin or Admin Key)
+router.post('/generate', adminKeyAuth, batchGenerateTags);
 router.post('/batch-generate', adminKeyAuth, batchGenerateTags);
 
 // Public 1-step register user + claim sticker + emergency contacts + docs

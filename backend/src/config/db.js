@@ -8,6 +8,9 @@ try {
   // Fallback to system default if not supported
 }
 
+// Reduce buffer timeout so requests fail fast with clear message instead of hanging
+mongoose.set('bufferTimeoutMS', 5000);
+
 let isConnected = false;
 
 const connectDB = async () => {
@@ -20,11 +23,13 @@ const connectDB = async () => {
     const atlasFallback = 'mongodb+srv://kiranrathod632_db_user:lKtisnFylyZbc1hs@cluster0.dvpntjn.mongodb.net/gadiraksha_db?retryWrites=true&w=majority';
     const uri = process.env.MONGO_URI || process.env.MONGODB_URI || atlasFallback;
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 8000
+      serverSelectionTimeoutMS: 5000,
+      family: 4 // Force IPv4 to prevent Windows IPv6 timeout hang
     });
     isConnected = true;
     console.log(`✅ MongoDB Connected: ${conn.connection.host} (Database: ${conn.connection.name})`);
   } catch (error) {
+    isConnected = false;
     console.error(`\n❌ MongoDB Atlas Connection Error: ${error.message}`);
     if (error.message.includes('whitelisted') || error.message.includes('Could not connect to any servers')) {
       console.error(`\n-----------------------------------------------------------`);
@@ -36,6 +41,7 @@ const connectDB = async () => {
       console.error(`5. Click "Confirm" (takes ~30s to activate)`);
       console.error(`-----------------------------------------------------------\n`);
     }
+    throw error;
   }
 };
 

@@ -56,17 +56,26 @@ const scanLimiter = rateLimit({
 
 // Ensure MongoDB Atlas connection on every request (cached in serverless)
 const connectDB = require('./config/db');
+const mongoose = require('mongoose');
+
 app.use(async (req, res, next) => {
   // Only connect for API requests
   if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/tags') || req.path.startsWith('/scan') || req.path.startsWith('/alerts') || req.path.startsWith('/admin') || req.path.startsWith('/sales')) {
     try {
       await connectDB();
     } catch (err) {
-      console.error('Database connection error in middleware:', err);
-      return res.status(500).json({
+      console.error('Database connection error in middleware:', err.message);
+      return res.status(503).json({
         success: false,
-        message: 'Database connection failed. Please ensure MONGO_URI is configured in Vercel environment variables.',
+        message: 'Database connection failed. Please ensure 0.0.0.0/0 is added in MongoDB Atlas Network Access: https://cloud.mongodb.com',
         error: err.message
+      });
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database is still connecting. Please try again in a few moments, and ensure IP 0.0.0.0/0 is whitelisted in MongoDB Atlas.'
       });
     }
   }

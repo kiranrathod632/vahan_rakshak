@@ -23,8 +23,10 @@ const connectDB = async () => {
     const atlasFallback = 'mongodb+srv://kiranrathod632_db_user:lKtisnFylyZbc1hs@cluster0.dvpntjn.mongodb.net/gadiraksha_db?retryWrites=true&w=majority';
     const uri = process.env.MONGO_URI || process.env.MONGODB_URI || atlasFallback;
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000,
-      family: 4 // Force IPv4 to prevent Windows IPv6 timeout hang
+      serverSelectionTimeoutMS: 8000,
+      family: 4, // Force IPv4 to prevent Windows IPv6 timeout hang
+      tls: true,
+      tlsAllowInvalidCertificates: true // Bypass TLS certificate chain verification issues on Windows
     });
     isConnected = true;
     console.log(`✅ MongoDB Connected: ${conn.connection.host} (Database: ${conn.connection.name})`);

@@ -26,8 +26,14 @@ const toDateString = (date) => {
 };
 
 async function seed() {
-  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/gadiraksha_db';
-  await mongoose.connect(uri);
+  const atlasFallback = 'mongodb+srv://kiranrathod632_db_user:lKtisnFylyZbc1hs@cluster0.dvpntjn.mongodb.net/gadiraksha_db?retryWrites=true&w=majority';
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || atlasFallback;
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 8000,
+    family: 4,
+    tls: true,
+    tlsAllowInvalidCertificates: true
+  });
   console.log('Connected to MongoDB Atlas for Sales Seeding...');
 
   // 1. Find or create Sachin Gaikwad (Sales Person)

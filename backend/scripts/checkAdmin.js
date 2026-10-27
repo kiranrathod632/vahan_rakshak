@@ -14,8 +14,14 @@ try {
 const User = require('../src/models/User');
 
 async function main() {
-  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/gadiraksha_db';
-  await mongoose.connect(uri);
+  const atlasFallback = 'mongodb+srv://kiranrathod632_db_user:lKtisnFylyZbc1hs@cluster0.dvpntjn.mongodb.net/gadiraksha_db?retryWrites=true&w=majority';
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || atlasFallback;
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 8000,
+    family: 4,
+    tls: true,
+    tlsAllowInvalidCertificates: true
+  });
   const users = await User.find({}, 'name phone role email');
   console.log('--- ALL USERS IN DB ---');
   users.forEach(u => console.log(`${u.role} | ${u.phone} | ${u.name}`));

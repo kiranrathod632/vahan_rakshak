@@ -54,6 +54,25 @@ const scanLimiter = rateLimit({
   }
 });
 
+// Ensure MongoDB Atlas connection on every request (cached in serverless)
+const connectDB = require('./config/db');
+app.use(async (req, res, next) => {
+  // Only connect for API requests
+  if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/tags') || req.path.startsWith('/scan') || req.path.startsWith('/alerts') || req.path.startsWith('/admin') || req.path.startsWith('/sales')) {
+    try {
+      await connectDB();
+    } catch (err) {
+      console.error('Database connection error in middleware:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Database connection failed. Please ensure MONGO_URI is configured in Vercel environment variables.',
+        error: err.message
+      });
+    }
+  }
+  next();
+});
+
 // API Routes (Mounted on both /api/* and /* for maximum client flexibility)
 app.use('/api/auth', authRoutes);
 app.use('/auth', authRoutes);

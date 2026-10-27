@@ -19,13 +19,18 @@ const server = http.createServer(app);
 // Initialize Socket.io
 initSocket(server);
 
-// Start Server
-server.listen(PORT, () => {
-  console.log(`\n=================================================`);
-  console.log(`🚀 GadiRaksha Backend Server Running!`);
-  console.log(`📡 Port: ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 Base URL: http://localhost:${PORT}`);
-  console.log(`💬 Socket.io: Enabled and Ready`);
-  console.log(`=================================================\n`);
-});
+// Only listen locally or in long-running container (not on Vercel serverless)
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`\n=================================================`);
+    console.log(`🚀 GadiRaksha Backend Server Running!`);
+    console.log(`📡 Port: ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Base URL: http://localhost:${PORT}`);
+    console.log(`💬 Socket.io: Enabled and Ready`);
+    console.log(`=================================================\n`);
+  });
+}
+
+// Export Express app for Vercel Serverless Function runtime
+module.exports = app;

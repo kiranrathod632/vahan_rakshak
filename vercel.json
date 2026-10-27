@@ -16,18 +16,18 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "backend/src/server.js"
+      "dest": "/backend/src/server.js"
     },
     {
       "src": "/socket.io/(.*)",
-      "dest": "backend/src/server.js"
+      "dest": "/backend/src/server.js"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/index.html"
+      "dest": "/frontend/index.html"
     }
   ]
 }

@@ -38,6 +38,8 @@ import {
   Clock,
   Printer,
   Copy,
+  Download,
+  Radio,
   Check,
   Building2,
   CreditCard,
@@ -133,6 +135,10 @@ export default function AdminDashboard() {
   const [batchGenStartNum, setBatchGenStartNum] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [genSuccessMsg, setGenSuccessMsg] = useState('');
+  const [generatedStickersList, setGeneratedStickersList] = useState([]);
+  const [showGenPrintModal, setShowGenPrintModal] = useState(false);
+  const [singlePrintSticker, setSinglePrintSticker] = useState(null);
+  const [showSinglePrintModal, setShowSinglePrintModal] = useState(false);
 
   // New User Form State
   const [newUserForm, setNewUserForm] = useState({
@@ -770,6 +776,8 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) {
         setGenSuccessMsg(`Generated ${data.count} unique printable QR stickers (${data.prefix})!`);
+        setGeneratedStickersList(data.data || []);
+        setShowGenPrintModal(true);
         loadAllData();
       } else {
         alert(data.message || 'Generation failed');
@@ -779,6 +787,224 @@ export default function AdminDashboard() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Dedicated Print / Save as PDF function for physical vehicle stickers
+  const handlePrintSheet = (stickersToPrint) => {
+    const list = stickersToPrint && stickersToPrint.length > 0 ? stickersToPrint : (generatedStickersList.length > 0 ? generatedStickersList : scanners);
+    if (!list || list.length === 0) {
+      alert('No stickers available to print');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const stickerHtml = list.map(s => {
+      const qrImg = s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(s.qrUrl || `${window.location.origin}/scan/${s.tagCode}`)}`;
+      return `
+        <div class="sticker-card">
+          <div class="left-section">
+            <div class="brand">
+              <span class="brand-name">GADIRAKSHA</span>
+              <span class="tag-label">SMART SAFETY</span>
+            </div>
+            <div class="sub-text">Car Safety tag by GadiRaksha, Scan to contact the vehicle owner.</div>
+            <div class="headline">
+              Scan the code <br/>
+              <u>to contact the</u> <br/>
+              vehicle owner.
+            </div>
+            <div class="footer-text">
+              SCAN USING PHONE CAMERA, GOOGLE LENS OR ANY QR SCANNER APP.
+            </div>
+          </div>
+          <div class="right-section">
+            <div class="qr-box">
+              <img src="${qrImg}" alt="${s.tagCode}" class="qr-img" />
+              <div class="tag-meta">
+                <span class="nfc-badge">📶 NFC</span>
+                <span class="code-badge">${s.tagCode}</span>
+              </div>
+            </div>
+            <div class="emergency-bar">
+              <div class="icons">🚫 🆘 ⚠️ 📞</div>
+              <div class="caption">Wrong Parking • Emergency Contact • Scan QR</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GadiRaksha-Stickers-${list.length}.pdf</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 8mm;
+          }
+          * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+          body { background: #f8fafc; padding: 12px; }
+          .sheet-header {
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #334155;
+            font-weight: 700;
+          }
+          .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            justify-content: center;
+          }
+          .sticker-card {
+            width: 100%;
+            height: 195px;
+            background: #ffffff;
+            border: 2px solid #0f172a;
+            border-radius: 14px;
+            overflow: hidden;
+            display: flex;
+            page-break-inside: avoid;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+          }
+          .left-section {
+            flex: 1;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .brand {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          }
+          .brand-name {
+            font-size: 17px;
+            font-weight: 900;
+            color: #0f172a;
+            letter-spacing: -0.5px;
+          }
+          .tag-label {
+            font-size: 8px;
+            font-weight: 800;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #475569;
+          }
+          .sub-text {
+            font-size: 8.5px;
+            color: #64748b;
+            line-height: 1.2;
+          }
+          .headline {
+            font-size: 13.5px;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.25;
+          }
+          .headline u {
+            text-decoration-color: #f59e0b;
+            text-decoration-thickness: 2.5px;
+            text-underline-offset: 2px;
+          }
+          .footer-text {
+            font-size: 7.5px;
+            color: #94a3b8;
+            font-weight: 700;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 4px;
+          }
+          .right-section {
+            width: 155px;
+            background: #facc15;
+            border-left: 2px solid #0f172a;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+          }
+          .qr-box {
+            background: #ffffff;
+            border: 2px solid #0f172a;
+            border-radius: 10px;
+            padding: 5px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }
+          .qr-img {
+            width: 105px;
+            height: 105px;
+            object-fit: contain;
+          }
+          .tag-meta {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 3px;
+            padding: 0 2px;
+          }
+          .nfc-badge {
+            font-size: 8.5px;
+            font-weight: 800;
+            color: #334155;
+          }
+          .code-badge {
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 900;
+            color: #0f172a;
+          }
+          .emergency-bar {
+            width: 100%;
+            text-align: center;
+          }
+          .icons {
+            font-size: 10px;
+            margin-bottom: 2px;
+          }
+          .caption {
+            font-size: 7px;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.1;
+          }
+          @media print {
+            body { background: transparent; padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="sheet-header no-print">
+          <button onclick="window.print()" style="padding:10px 24px;font-size:14px;font-weight:bold;background:#0f172a;color:#fff;border:none;border-radius:8px;cursor:pointer;">📄 Download PDF / Print Stickers Sheet</button>
+          <span style="margin-left:12px;color:#64748b;font-size:12px;">(Select "Destination: Save as PDF" in the print dialog)</span>
+        </div>
+        <div class="grid-container">
+          ${stickerHtml}
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() { window.print(); }, 400);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   // Resolve Emergency Incident
@@ -1673,59 +1899,118 @@ export default function AdminDashboard() {
 
           {/* Scanners List Table */}
           <div className="card overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-[#1f2333]">
-              <h3 className="text-sm font-bold text-ink">Pre-Printed QR Sticker Inventory</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">All registered tags in database</p>
+            <div className="p-4 border-b border-slate-100 dark:border-[#1f2333] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-ink">Pre-Printed QR Sticker Inventory</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">All registered tags in database ({scanners.length} total)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const unclaimed = scanners.filter(s => s.status === 'UNCLAIMED');
+                  setGeneratedStickersList(unclaimed.length > 0 ? unclaimed : scanners);
+                  setShowGenPrintModal(true);
+                }}
+                className="btn-primary !py-1.5 !px-3 text-xs font-bold flex items-center gap-1.5 !bg-amber-500 hover:!bg-amber-600 !text-slate-950 shadow-md shadow-amber-500/20"
+              >
+                <Printer className="size-3.5" />
+                <span>Print All Blank Stickers (Sheet)</span>
+              </button>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
                   <tr>
-                    <th className="py-3 px-5">Sticker Code</th>
-                    <th className="py-3 px-5">Status</th>
-                    <th className="py-3 px-5">Assigned Vehicle</th>
-                    <th className="py-3 px-5">Claimed By Owner</th>
-                    <th className="py-3 px-5 text-right">Actions</th>
+                    <th className="py-3 px-4">QR Preview</th>
+                    <th className="py-3 px-4">Sticker Code</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Assigned Vehicle</th>
+                    <th className="py-3 px-4">Claimed By Owner</th>
+                    <th className="py-3 px-4 text-right">Print & Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
-                  {scanners.map((s) => (
-                    <tr key={s._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
-                      <td className="py-3 px-5 font-mono font-bold text-brand-700 dark:text-cyan-400 text-sm">
-                        {s.tagCode}
-                      </td>
-                      <td className="py-3 px-5">
-                        <StatusBadge status={s.status} />
-                      </td>
-                      <td className="py-3 px-5">
-                        {s.vehicleDetails?.vehicleNumber ? (
-                          <PlateBadge value={s.vehicleDetails.vehicleNumber} size="sm" />
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Unassigned (Fresh stock)</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-5">
-                        {s.user?.name || s.user?.phone ? (
-                          <div>
-                            <span className="font-semibold text-ink block">{s.user.name}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">+91 {s.user.phone}</span>
+                  {scanners.map((s) => {
+                    const qrImg = s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(s.qrUrl || `${window.location.origin}/scan/${s.tagCode}`)}`;
+                    return (
+                      <tr key={s._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
+                        <td className="py-2.5 px-4">
+                          <div
+                            onClick={() => {
+                              setSinglePrintSticker(s);
+                              setShowSinglePrintModal(true);
+                            }}
+                            className="size-11 p-1 bg-white rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer hover:scale-105 transition grid place-items-center"
+                            title="Click to view & print physical sticker"
+                          >
+                            <img
+                              src={qrImg}
+                              alt={s.tagCode}
+                              className="size-9 object-contain"
+                            />
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Unclaimed</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-5 text-right">
-                        <button
-                          onClick={() => navigate(`/scan/${s.tagCode}`)}
-                          className="btn-secondary !py-1 !px-2.5 text-xs"
-                        >
-                          <ExternalLink className="size-3" />
-                          <span>Scan</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-brand-700 dark:text-cyan-400 text-sm">
+                          {s.tagCode}
+                        </td>
+                        <td className="py-3 px-4">
+                          <StatusBadge status={s.status} />
+                        </td>
+                        <td className="py-3 px-4">
+                          {s.vehicleDetails?.vehicleNumber ? (
+                            <PlateBadge value={s.vehicleDetails.vehicleNumber} size="sm" />
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Unassigned (Fresh stock)</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {s.user?.name || s.user?.phone ? (
+                            <div>
+                              <span className="font-semibold text-ink block">{s.user.name}</span>
+                              <span className="text-[11px] text-slate-400 font-mono">+91 {s.user.phone}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Unclaimed</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSinglePrintSticker(s);
+                                setShowSinglePrintModal(true);
+                              }}
+                              className="btn-primary !py-1 !px-2.5 text-[11px] !bg-amber-500 hover:!bg-amber-600 !text-slate-950 font-bold flex items-center gap-1 shadow-sm shadow-amber-500/10"
+                              title="Print Physical Sticker for Selling"
+                            >
+                              <Printer className="size-3" />
+                              <span>Print</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                const a = document.createElement('a');
+                                a.href = qrImg;
+                                a.download = `${s.tagCode}-GadiRaksha-Sticker.png`;
+                                a.click();
+                              }}
+                              className="btn-secondary !py-1 !px-2 text-[11px] flex items-center gap-1"
+                              title="Download QR Image"
+                            >
+                              <Download className="size-3" />
+                            </button>
+                            <button
+                              onClick={() => navigate(`/scan/${s.tagCode}`)}
+                              className="btn-secondary !py-1 !px-2 text-[11px] text-slate-500"
+                              title="Preview bystander scan page"
+                            >
+                              <ExternalLink className="size-3" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -3669,6 +3954,199 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: BULK PRINT STICKERS SHEET (PDF EXPORT) ================= */}
+      {showGenPrintModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-ink/75 dark:bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-white dark:bg-[#12141e] p-6 shadow-2xl border border-slate-200 dark:border-[#1f2333] space-y-4">
+            
+            {/* Modal Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1f2333] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-xl bg-amber-500/10 text-amber-500 grid place-items-center">
+                    <Printer className="size-4" />
+                  </div>
+                  <h3 className="font-bold text-lg text-ink dark:text-white">
+                    Printable QR Stickers Sheet (PDF Export)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {generatedStickersList.length} stickers ready. Click below to download PDF or print directly on sticker sheets.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintSheet(generatedStickersList)}
+                  className="btn-primary !bg-amber-500 hover:!bg-amber-600 !text-slate-950 font-bold text-xs py-2 px-4 shadow-lg shadow-amber-500/20 flex items-center gap-1.5"
+                >
+                  <FileText className="size-4" />
+                  <span>📄 Download PDF / Print Sheet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowGenPrintModal(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-ink text-sm font-bold border border-slate-200 dark:border-[#1f2333]"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Instruction banner */}
+            <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60 text-xs text-amber-900 dark:text-amber-300 flex items-center justify-between">
+              <span>💡 <strong>Tip for PDF:</strong> In the print popup, select <strong>"Destination: Save as PDF"</strong> to save this sheet as a PDF file on your computer.</span>
+            </div>
+
+            {/* Scrollable Preview Grid of Physical Sticker Cards */}
+            <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {generatedStickersList.map((s) => {
+                const qrImg = s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(s.qrUrl || `${window.location.origin}/scan/${s.tagCode}`)}`;
+                return (
+                  <div key={s._id || s.tagCode} className="w-full bg-white rounded-2xl border-2 border-slate-900 shadow-md overflow-hidden flex flex-col text-slate-900 font-sans">
+                    <div className="p-3.5 flex flex-col justify-between space-y-1.5 border-b border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-base font-black tracking-tight font-display text-slate-950">
+                          GADIRAKSHA<span className="text-amber-500">.IN</span>
+                        </span>
+                        <span className="text-[8px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                          SMART TAG
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-black leading-tight text-slate-950 font-display">
+                        Scan the code <br />
+                        <span className="underline decoration-amber-400 decoration-2 underline-offset-2">to contact the</span> vehicle owner.
+                      </h4>
+                    </div>
+
+                    <div className="bg-amber-400 p-2.5 flex flex-col items-center space-y-1.5">
+                      <div className="bg-white p-1.5 rounded-xl border-2 border-slate-900 shadow-sm w-full max-w-[170px] flex flex-col items-center">
+                        <img src={qrImg} alt={s.tagCode} className="size-28 object-contain mx-auto" />
+                        <div className="flex items-center justify-between w-full mt-1 px-1 border-t border-slate-100 pt-0.5">
+                          <span className="text-[9px] font-bold text-slate-700">📶 NFC</span>
+                          <span className="font-mono font-black text-xs tracking-wider text-slate-950">{s.tagCode}</span>
+                        </div>
+                      </div>
+                      <p className="text-[8px] font-extrabold text-slate-950 text-center leading-tight">
+                        Wrong Parking • Emergency Contact • Scan QR
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-[#1f2333]">
+              <span className="text-xs text-slate-400 font-mono">Total {generatedStickersList.length} items</span>
+              <button
+                type="button"
+                onClick={() => setShowGenPrintModal(false)}
+                className="btn-secondary !py-2 !px-5 text-xs font-bold"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: PRINT SINGLE STICKER (PDF / PRINT) ================= */}
+      {showSinglePrintModal && singlePrintSticker && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-ink/75 dark:bg-black/85 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#12141e] p-6 shadow-2xl border border-slate-200 dark:border-[#1f2333] space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1f2333] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="size-8 rounded-xl bg-amber-500/10 text-amber-500 grid place-items-center">
+                  <Printer className="size-4" />
+                </div>
+                <h3 className="font-bold text-base text-ink dark:text-white">
+                  Physical Sticker ({singlePrintSticker.tagCode})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSinglePrintModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-ink text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Exact Physical Sticker Card Layout */}
+            <div className="w-full bg-white rounded-2xl border-2 border-slate-900 shadow-xl overflow-hidden flex flex-col text-slate-900 font-sans mx-auto">
+              <div className="p-4 flex flex-col justify-between space-y-2 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xl font-black tracking-tight font-display text-slate-950">
+                    GADIRAKSHA<span className="text-amber-500">.IN</span>
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                    SMART TAG
+                  </span>
+                </div>
+                <h3 className="text-sm font-black leading-snug tracking-tight text-slate-950 font-display">
+                  Scan the code <br />
+                  <span className="underline decoration-amber-400 decoration-2 underline-offset-2">to contact the</span> vehicle owner.
+                </h3>
+              </div>
+
+              <div className="bg-amber-400 p-4 flex flex-col items-center space-y-2">
+                <div className="bg-white p-2 rounded-xl border-2 border-slate-900 shadow-sm w-full max-w-[200px] flex flex-col items-center">
+                  <img
+                    src={singlePrintSticker.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(singlePrintSticker.qrUrl || `${window.location.origin}/scan/${singlePrintSticker.tagCode}`)}`}
+                    alt={singlePrintSticker.tagCode}
+                    className="size-40 object-contain mx-auto"
+                  />
+                  <div className="flex items-center justify-between w-full mt-1 px-1 border-t border-slate-100 pt-1">
+                    <span className="text-[10px] font-bold text-slate-700">📶 NFC</span>
+                    <span className="font-mono font-black text-sm tracking-wider text-slate-950">{singlePrintSticker.tagCode}</span>
+                  </div>
+                </div>
+
+                <div className="w-full text-center space-y-1">
+                  <div className="flex items-center justify-center gap-2 text-slate-950 text-xs">
+                    <span title="Wrong Parking" className="p-1 rounded-full bg-white/70 font-bold">🚫</span>
+                    <span title="Emergency / SOS" className="p-1 rounded-full bg-white/70 font-bold">🆘</span>
+                    <span title="Caution / Towing" className="p-1 rounded-full bg-white/70 font-bold">⚠️</span>
+                    <span title="Direct Call" className="p-1 rounded-full bg-white/70 font-bold">📞</span>
+                  </div>
+                  <p className="text-[9px] font-extrabold text-slate-950 leading-tight">
+                    Wrong Parking • Emergency Contact • Scan QR
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => handlePrintSheet([singlePrintSticker])}
+                className="btn-primary !bg-amber-500 hover:!bg-amber-600 !text-slate-950 font-bold flex-1 text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20"
+              >
+                <FileText className="size-4" />
+                <span>📄 Download PDF / Print</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const qrImg = singlePrintSticker.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(singlePrintSticker.qrUrl || `${window.location.origin}/scan/${singlePrintSticker.tagCode}`)}`;
+                  const a = document.createElement('a');
+                  a.href = qrImg;
+                  a.download = `${singlePrintSticker.tagCode}-GadiRaksha.png`;
+                  a.click();
+                }}
+                className="btn-secondary flex-1 text-xs py-2.5 flex items-center justify-center gap-1.5"
+              >
+                <Download className="size-4" />
+                <span>Download PNG</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

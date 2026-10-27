@@ -107,9 +107,6 @@ export default function Dashboard() {
       setClaimLoading(false);
     }
   };
-      setClaimLoading(false);
-    }
-  };
 
   const activeScannersCount = tags.filter(t => t.status === 'ACTIVE').length;
   const expiringDocsCount = tags.filter(t => t.documentExpiryStatus?.hasExpiringOrExpired).length;

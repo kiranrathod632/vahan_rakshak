@@ -25,6 +25,13 @@ export default function Scanners() {
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
 
+  // Claim state
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedVehicle, setSelectedVehicle] = useState('');
+  const [customVehicle, setCustomVehicle] = useState('');
+  const [claiming, setClaiming] = useState(false);
+  const [claimMsg, setClaimMsg] = useState('');
+
   const loadTags = async () => {
     try {
       const res = await authFetch('/api/tags/my-tags');
@@ -39,7 +46,49 @@ export default function Scanners() {
 
   useEffect(() => {
     loadTags();
+    authFetch('/api/auth/vehicles')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.data) {
+          setVehicles(d.data);
+          if (d.data.length > 0) setSelectedVehicle(d.data[0].vehicleNumber);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  const handleClaimSticker = async () => {
+    if (!activeCode || !activeCode.trim()) return;
+    setClaiming(true);
+    setClaimMsg('');
+    const targetPlate = selectedVehicle === 'NEW' ? customVehicle : (selectedVehicle || vehicles[0]?.vehicleNumber || customVehicle);
+    if (!targetPlate || !targetPlate.trim()) {
+      alert('Please enter or select a vehicle number to assign this sticker');
+      setClaiming(false);
+      return;
+    }
+
+    try {
+      const res = await authFetch('/api/tags/claim', {
+        method: 'POST',
+        body: JSON.stringify({
+          tagCode: activeCode.trim().toUpperCase(),
+          vehicleNumber: targetPlate.trim().toUpperCase()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setClaimMsg(`Sticker ${activeCode.toUpperCase()} successfully claimed and linked to ${targetPlate.toUpperCase()}!`);
+        loadTags();
+      } else {
+        alert(data.message || 'Failed to claim sticker');
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${window.location.origin}/scan/${activeCode}`;
 
@@ -162,6 +211,61 @@ export default function Scanners() {
                 className="btn-primary !px-5 text-xs font-bold"
               >
                 Set Sticker
+              </button>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-[#1f2333] space-y-3">
+              <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
+                Claim / Bind Sticker {activeCode} to Your Vehicle
+              </h3>
+              {vehicles.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Select Your Vehicle
+                  </label>
+                  <select
+                    value={selectedVehicle}
+                    onChange={(e) => setSelectedVehicle(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-semibold text-ink dark:text-white focus:outline-none"
+                  >
+                    {vehicles.map(v => (
+                      <option key={v._id} value={v.vehicleNumber}>
+                        {v.vehicleNumber} ({v.vehicleModel || v.vehicleType || 'Vehicle'})
+                      </option>
+                    ))}
+                    <option value="NEW">➕ Add New Vehicle Number</option>
+                  </select>
+                </div>
+              )}
+
+              {(vehicles.length === 0 || selectedVehicle === 'NEW') && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Enter Vehicle Number Plate
+                  </label>
+                  <input
+                    type="text"
+                    value={customVehicle}
+                    onChange={(e) => setCustomVehicle(e.target.value)}
+                    placeholder="e.g. MH 19 AB 1234"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2 text-xs font-mono font-bold uppercase text-ink dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+
+              {claimMsg && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="size-4 text-emerald-500" />
+                  <span>{claimMsg}</span>
+                </div>
+              )}
+
+              <button
+                onClick={handleClaimSticker}
+                disabled={claiming}
+                className="btn-primary w-full text-xs font-bold !bg-amber-500 hover:!bg-amber-600 !text-slate-950 shadow-md shadow-amber-500/20"
+              >
+                {claiming ? 'Linking Sticker...' : `Claim & Link ${activeCode} to Selected Vehicle`}
               </button>
             </div>
 

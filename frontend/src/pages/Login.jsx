@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Shield, Phone, Lock, ChevronRight, Sun, Moon, Car, Sparkles, Briefcase, KeyRound } from 'lucide-react';
+import { Shield, Phone, Lock, ChevronRight, Sun, Moon, Car, Sparkles, Briefcase, KeyRound, QrCode } from 'lucide-react';
 
 export default function Login() {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const redirectTag = (searchParams.get('tagCode') || location.state?.tagCode || '').toUpperCase().trim();
+
   const [phone, setPhone] = useState('9823000000');
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
@@ -25,6 +29,8 @@ export default function Login() {
         navigate('/sales');
       } else if (userRole === 'admin' || userRole === 'superadmin') {
         navigate('/admin');
+      } else if (redirectTag) {
+        navigate(`/scan/${redirectTag}`);
       } else {
         navigate('/app');
       }
@@ -80,6 +86,13 @@ export default function Login() {
               Access your personal vehicle garage, QR scanners, emergency contacts, and notifications.
             </p>
           </div>
+
+          {redirectTag && (
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-semibold flex items-center gap-2">
+              <QrCode className="size-4 text-amber-600 shrink-0" />
+              <span>Login to immediately link pre-printed sticker <strong>{redirectTag}</strong> to your vehicle!</span>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900/60">

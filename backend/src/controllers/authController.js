@@ -401,6 +401,12 @@ const addVehicle = async (req, res, next) => {
     // Link tag if tagCode provided
     if (cleanTagCode) {
       let tag = await Tag.findOne({ tagCode: cleanTagCode });
+      if (tag && tag.status === 'ACTIVE' && tag.user && String(tag.user) !== String(user._id)) {
+        return res.status(400).json({
+          success: false,
+          message: `Sticker code "${cleanTagCode}" is already claimed by another vehicle owner.`
+        });
+      }
       if (!tag) {
         const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
         tag = new Tag({

@@ -2,6 +2,7 @@ const QRCode = require('qrcode');
 const crypto = require('crypto');
 const Tag = require('../models/Tag');
 const User = require('../models/User');
+const Vehicle = require('../models/Vehicle');
 const jwt = require('jsonwebtoken');
 const { checkDocumentExpiryStatus } = require('../services/notificationService');
 
@@ -396,30 +397,65 @@ const claimTag = async (req, res, next) => {
     }
 
     const cleanTagCode = tagCode.trim().toUpperCase();
-    const tag = await Tag.findOne({ tagCode: cleanTagCode });
+    let tag = await Tag.findOne({ tagCode: cleanTagCode });
 
+    // Support pre-printed physical scanners not yet in database
     if (!tag) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invalid Tag Code. Please check the code on your sticker.'
+      const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+      tag = new Tag({
+        tagCode: cleanTagCode,
+        qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,
+        status: 'UNCLAIMED'
       });
     }
 
-    if (tag.status === 'ACTIVE' && tag.user) {
+    if (tag.status === 'ACTIVE' && tag.user && String(tag.user) !== String(req.user._id)) {
       return res.status(400).json({
         success: false,
-        message: 'This tag is already claimed and registered to another vehicle.'
+        message: `This sticker code "${cleanTagCode}" is already claimed and registered to another vehicle.`
       });
+    }
+
+    // Find or create Vehicle for this user in Vehicle collection
+    const cleanVNum = vehicleNumber.toUpperCase().trim().replace(/\s+/g, ' ');
+    let vehicle = await Vehicle.findOne({
+      user: req.user._id,
+      vehicleNumber: cleanVNum
+    });
+
+    const user = await User.findById(req.user._id);
+
+    if (!vehicle) {
+      vehicle = await Vehicle.create({
+        user: req.user._id,
+        vehicleNumber: cleanVNum,
+        vehicleType: vehicleType || 'Two-Wheeler',
+        vehicleModel: vehicleModel || '',
+        vehicleColor: vehicleColor || '',
+        tagCode: cleanTagCode,
+        isPrimary: !user?.primaryVehicle
+      });
+
+      if (user) {
+        user.vehicles.push(vehicle._id);
+        if (!user.primaryVehicle) {
+          user.primaryVehicle = vehicle._id;
+        }
+        await user.save();
+      }
+    } else {
+      vehicle.tagCode = cleanTagCode;
     }
 
     tag.user = req.user._id;
+    tag.vehicle = vehicle._id;
     tag.status = 'ACTIVE';
     tag.claimedAt = new Date();
     tag.vehicleDetails = {
-      vehicleNumber: vehicleNumber.toUpperCase().trim(),
-      vehicleType: vehicleType || 'Four-Wheeler',
-      vehicleModel: vehicleModel || '',
-      vehicleColor: vehicleColor || ''
+      vehicleNumber: vehicle.vehicleNumber,
+      vehicleType: vehicle.vehicleType || vehicleType || 'Two-Wheeler',
+      vehicleModel: vehicle.vehicleModel || vehicleModel || '',
+      vehicleColor: vehicle.vehicleColor || vehicleColor || ''
     };
 
     tag.purchaseInfo = {
@@ -433,10 +469,16 @@ const claimTag = async (req, res, next) => {
 
     await tag.save();
 
+    vehicle.tag = tag._id;
+    await vehicle.save();
+
     res.json({
       success: true,
-      message: `Tag ${tag.tagCode} successfully linked to vehicle ${vehicleNumber.toUpperCase()}`,
-      data: tag
+      message: `Scanner ${tag.tagCode} successfully assigned to vehicle ${vehicle.vehicleNumber}!`,
+      data: {
+        tag,
+        vehicle
+      }
     });
   } catch (error) {
     next(error);

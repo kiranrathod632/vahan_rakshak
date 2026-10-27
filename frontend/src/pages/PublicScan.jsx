@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import PlateBadge from '../components/PlateBadge';
 import StatusBadge from '../components/StatusBadge';
@@ -23,13 +24,17 @@ import {
   Lightbulb,
   AlertOctagon,
   Volume2,
-  Send
+  Send,
+  QrCode,
+  LogIn,
+  Plus
 } from 'lucide-react';
 
 export default function PublicScan() {
   const { tagCode = 'MH-1001' } = useParams();
   const navigate = useNavigate();
   const { theme, toggleTheme, isDark } = useTheme();
+  const { user, authFetch } = useAuth();
 
   const [scanData, setScanData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +46,34 @@ export default function PublicScan() {
   const [scannerNote, setScannerNote] = useState('');
   const [dispatching, setDispatching] = useState(false);
   const [dispatchResult, setDispatchResult] = useState(null);
+
+  // Claim state for logged-in users
+  const [userVehicles, setUserVehicles] = useState([]);
+  const [selectedVehicleNum, setSelectedVehicleNum] = useState('');
+  const [customVehicleNum, setCustomVehicleNum] = useState('');
+  const [customVehicleType, setCustomVehicleType] = useState('Car');
+  const [claiming, setClaiming] = useState(false);
+  const [claimErr, setClaimErr] = useState('');
+  const [claimSuccessMsg, setClaimSuccessMsg] = useState('');
+
+  // Fetch logged-in user vehicles
+  useEffect(() => {
+    if (user) {
+      authFetch('/api/auth/vehicles')
+        .then(r => r.json())
+        .then(d => {
+          if (d.success && Array.isArray(d.data)) {
+            setUserVehicles(d.data);
+            if (d.data.length > 0) {
+              setSelectedVehicleNum(d.data[0].vehicleNumber);
+            } else {
+              setSelectedVehicleNum('NEW');
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     // Attempt to get user GPS
@@ -134,6 +167,48 @@ export default function PublicScan() {
 
   // First time scan of pre-printed unclaimed sticker
   if (scanData?.status === 'UNCLAIMED' || scanData?.isFirstTimeScan) {
+    const handleClaimForLoggedInUser = async (e) => {
+      e.preventDefault();
+      setClaiming(true);
+      setClaimErr('');
+      setClaimSuccessMsg('');
+
+      const targetVehicle = selectedVehicleNum === 'NEW' ? customVehicleNum : (selectedVehicleNum || customVehicleNum);
+      if (!targetVehicle || !targetVehicle.trim()) {
+        setClaimErr('Please enter or select a vehicle number');
+        setClaiming(false);
+        return;
+      }
+
+      try {
+        const res = await authFetch('/api/tags/claim', {
+          method: 'POST',
+          body: JSON.stringify({
+            tagCode,
+            vehicleNumber: targetVehicle.trim().toUpperCase(),
+            vehicleType: customVehicleType
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setClaimSuccessMsg(data.message || 'Scanner claimed successfully!');
+          setTimeout(async () => {
+            const freshRes = await fetch(`/api/scan/${tagCode}`);
+            const freshData = await freshRes.json();
+            if (freshData.success) {
+              setScanData(freshData);
+            }
+          }, 1200);
+        } else {
+          setClaimErr(data.message || 'Failed to claim sticker');
+        }
+      } catch (err) {
+        setClaimErr('Error claiming sticker: ' + err.message);
+      } finally {
+        setClaiming(false);
+      }
+    };
+
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-[#0b0d14] text-slate-800 dark:text-slate-100 transition-colors duration-200">
         <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#12141e] p-6 sm:p-8 border border-slate-200/90 dark:border-[#1f2333] text-center space-y-5 shadow-2xl relative">
@@ -162,26 +237,136 @@ export default function PublicScan() {
             </p>
           </div>
 
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-            This physical GadiRaksha QR safety sticker is brand new and unclaimed! On this first scan, register your account and vehicle to permanently link this sticker to you.
-          </p>
+          {user ? (
+            /* User is already registered and logged in */
+            <div className="space-y-4 text-left pt-1">
+              <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a] text-xs">
+                <p className="text-slate-500 dark:text-slate-400">Logged in as:</p>
+                <p className="font-bold text-ink dark:text-white text-sm">{user.name || 'Vehicle Owner'} ({user.phone})</p>
+              </div>
 
-          <div className="space-y-2.5 pt-2">
-            <button
-              onClick={() => navigate(`/register?tagCode=${tagCode}`, { state: { tagCode } })}
-              className="btn-primary w-full !bg-amber-500 hover:!bg-amber-600 !text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
-            >
-              <span>Register & Make This Sticker Yours</span>
-              <ChevronRight className="size-4" />
-            </button>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                You have scanned this physical sticker for the first time! Link it to your vehicle to activate 24x7 emergency coverage:
+              </p>
 
-            <button
-              onClick={() => navigate(`/activate?tagCode=${tagCode}`, { state: { tagCode } })}
-              className="w-full text-xs font-semibold py-2 px-3 rounded-xl border border-slate-200 dark:border-[#22253a] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#161826] transition"
-            >
-              Or Use Express 1-Step Activation
-            </button>
-          </div>
+              <form onSubmit={handleClaimForLoggedInUser} className="space-y-3">
+                {userVehicles.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Select Vehicle to Assign
+                    </label>
+                    <select
+                      value={selectedVehicleNum}
+                      onChange={(e) => setSelectedVehicleNum(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-semibold text-ink dark:text-white focus:outline-none"
+                    >
+                      {userVehicles.map(v => (
+                        <option key={v._id} value={v.vehicleNumber}>
+                          {v.vehicleNumber} ({v.vehicleModel || v.vehicleType || 'Vehicle'})
+                        </option>
+                      ))}
+                      <option value="NEW">➕ Add New Vehicle</option>
+                    </select>
+                  </div>
+                )}
+
+                {(userVehicles.length === 0 || selectedVehicleNum === 'NEW') && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Vehicle Number Plate
+                      </label>
+                      <input
+                        type="text"
+                        value={customVehicleNum}
+                        onChange={(e) => setCustomVehicleNum(e.target.value)}
+                        placeholder="e.g. MH 19 AB 1234"
+                        required
+                        className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2 text-xs font-mono font-bold uppercase text-ink dark:text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Vehicle Type
+                      </label>
+                      <select
+                        value={customVehicleType}
+                        onChange={(e) => setCustomVehicleType(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-semibold text-ink dark:text-white focus:outline-none"
+                      >
+                        <option value="Two-Wheeler">Two-Wheeler (Bike / Scooter)</option>
+                        <option value="Car">Car / SUV</option>
+                        <option value="Auto">Auto Rickshaw</option>
+                        <option value="Commercial">Commercial / Truck / Bus</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {claimErr && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900/60">
+                    {claimErr}
+                  </div>
+                )}
+
+                {claimSuccessMsg && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200 dark:border-emerald-900/60 flex items-center gap-1.5">
+                    <CheckCircle2 className="size-4 text-emerald-500" />
+                    <span>{claimSuccessMsg} Activating...</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={claiming}
+                  className="btn-primary w-full !bg-amber-500 hover:!bg-amber-600 !text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 text-xs py-2.5"
+                >
+                  <QrCode className="size-4" />
+                  <span>{claiming ? 'Linking Sticker...' : `Claim & Link ${tagCode} to My Vehicle`}</span>
+                </button>
+              </form>
+
+              <button
+                type="button"
+                onClick={() => navigate('/app')}
+                className="w-full text-center text-xs text-slate-500 dark:text-slate-400 hover:underline pt-1"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          ) : (
+            /* Visitor is not logged in */
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                This physical GadiRaksha QR safety sticker is brand new and unclaimed! On this first scan, register your account or log in to permanently link this sticker to your vehicle.
+              </p>
+
+              <div className="space-y-2.5 pt-2">
+                <button
+                  onClick={() => navigate(`/register?tagCode=${tagCode}`, { state: { tagCode } })}
+                  className="btn-primary w-full !bg-amber-500 hover:!bg-amber-600 !text-slate-950 font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                >
+                  <span>Register & Make This Sticker Yours</span>
+                  <ChevronRight className="size-4" />
+                </button>
+
+                <button
+                  onClick={() => navigate(`/login?tagCode=${tagCode}`, { state: { tagCode } })}
+                  className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-cyan-400 bg-brand-50/50 dark:bg-brand-950/30 hover:bg-brand-100 transition flex items-center justify-center gap-1.5"
+                >
+                  <LogIn className="size-3.5" />
+                  <span>Already Registered? Log In to Link Sticker</span>
+                </button>
+
+                <button
+                  onClick={() => navigate(`/activate?tagCode=${tagCode}`, { state: { tagCode } })}
+                  className="w-full text-xs font-semibold py-2 px-3 rounded-xl border border-slate-200 dark:border-[#22253a] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#161826] transition"
+                >
+                  Or Use Express 1-Step Wizard
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -34,7 +34,9 @@ export default function Dashboard() {
 
   // Quick pre-printed claim modal state
   const [showClaimModal, setShowClaimModal] = useState(false);
-  const [claimTagCode, setClaimTagCode] = useState('MH-1001');
+  const [claimTagCode, setClaimTagCode] = useState('');
+  const [selectedClaimVehicle, setSelectedClaimVehicle] = useState('');
+  const [customClaimVehicle, setCustomClaimVehicle] = useState('');
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimSuccess, setClaimSuccess] = useState('');
 
@@ -47,7 +49,11 @@ export default function Dashboard() {
         authFetch('/api/alerts/my-alerts').then(r => r.json()).catch(() => ({ data: [] }))
       ]);
 
-      setVehicles(vRes.data || []);
+      const vList = vRes.data || [];
+      setVehicles(vList);
+      if (vList.length > 0 && !selectedClaimVehicle) {
+        setSelectedClaimVehicle(vList[0].vehicleNumber);
+      }
       setTags(tRes.data || []);
       setAlerts(aRes.data || []);
     } catch (err) {
@@ -64,50 +70,43 @@ export default function Dashboard() {
   // Quick pre-printed claim submit
   const handleQuickClaim = async (e) => {
     e.preventDefault();
-    if (!claimTagCode) return;
+    if (!claimTagCode || !claimTagCode.trim()) return;
     setClaimLoading(true);
     setClaimSuccess('');
 
-    try {
-      const payload = {
-        tagCode: claimTagCode.trim().toUpperCase(),
-        name: user?.name || 'Sambhaji Patil',
-        phone: user?.phone || '9823000000',
-        password: 'password123',
-        profilePic: user?.profilePic || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-        gender: user?.gender || 'Male',
-        bloodGroup: user?.bloodGroup || 'B+',
-        weight: user?.weight || 72,
-        height: user?.height || '5.8 ft',
-        address: user?.address?.fullAddress || 'Station Road, Pachora, Dist. Jalgaon - 424201',
-        vehicleNumber: vehicles[0]?.vehicleNumber || 'MH19 AB 1234',
-        vehicleType: vehicles[0]?.vehicleType || 'Two-Wheeler',
-        vehicleModel: vehicles[0]?.vehicleModel || 'Honda Activa 6G',
-        emergencyContacts: user?.emergencyContacts?.length > 0 ? user.emergencyContacts : [
-          { name: 'Pandurang Patil (Father)', relation: 'Father', phone: '9822111111' },
-          { name: 'Sunita Patil (Spouse)', relation: 'Spouse', phone: '9822222222' },
-          { name: 'Anil Patil (Brother)', relation: 'Brother', phone: '9822333333' }
-        ],
-        puc: { docNumber: 'MH19-PUC-98214' },
-        insurance: { docNumber: 'BAJAJ-ALLIANZ-882' }
-      };
+    const targetVehicle = selectedClaimVehicle === 'NEW' ? customClaimVehicle : (selectedClaimVehicle || vehicles[0]?.vehicleNumber || customClaimVehicle);
+    if (!targetVehicle || !targetVehicle.trim()) {
+      alert('Please enter or select a vehicle number');
+      setClaimLoading(false);
+      return;
+    }
 
-      const res = await fetch('/api/tags/register-and-claim', {
+    try {
+      const res = await authFetch('/api/tags/claim', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          tagCode: claimTagCode.trim().toUpperCase(),
+          vehicleNumber: targetVehicle.trim().toUpperCase()
+        })
       });
       const data = await res.json();
       if (data.success) {
-        setClaimSuccess(`Sticker ${claimTagCode.toUpperCase()} claimed & permanently activated!`);
+        setClaimSuccess(`Sticker ${claimTagCode.toUpperCase()} claimed & permanently assigned to ${targetVehicle.toUpperCase()}!`);
         loadData();
-        setTimeout(() => setShowClaimModal(false), 2000);
+        setTimeout(() => {
+          setShowClaimModal(false);
+          setClaimSuccess('');
+          setClaimTagCode('');
+        }, 2000);
       } else {
         alert(data.message || 'Failed to claim sticker');
       }
     } catch (err) {
       alert('Error: ' + err.message);
     } finally {
+      setClaimLoading(false);
+    }
+  };
       setClaimLoading(false);
     }
   };
@@ -578,6 +577,42 @@ export default function Dashboard() {
                   className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2.5 text-sm font-mono uppercase font-bold text-ink dark:text-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
+
+              {vehicles.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Assign to Vehicle
+                  </label>
+                  <select
+                    value={selectedClaimVehicle}
+                    onChange={(e) => setSelectedClaimVehicle(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2.5 text-xs font-semibold text-ink dark:text-white focus:outline-none"
+                  >
+                    {vehicles.map(v => (
+                      <option key={v._id} value={v.vehicleNumber}>
+                        {v.vehicleNumber} ({v.vehicleModel || v.vehicleType || 'Vehicle'})
+                      </option>
+                    ))}
+                    <option value="NEW">➕ Add New Vehicle</option>
+                  </select>
+                </div>
+              )}
+
+              {(vehicles.length === 0 || selectedClaimVehicle === 'NEW') && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Vehicle Number Plate
+                  </label>
+                  <input
+                    type="text"
+                    value={customClaimVehicle}
+                    onChange={(e) => setCustomClaimVehicle(e.target.value)}
+                    placeholder="e.g. MH 19 AB 1234"
+                    required
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2.5 text-xs font-mono font-bold uppercase text-ink dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
 
               {claimSuccess && (
                 <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center gap-2">

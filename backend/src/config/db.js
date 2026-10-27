@@ -25,11 +25,17 @@ const connectDB = async () => {
     isConnected = true;
     console.log(`✅ MongoDB Connected: ${conn.connection.host} (Database: ${conn.connection.name})`);
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    if (!process.env.VERCEL) {
-      process.exit(1);
+    console.error(`\n❌ MongoDB Atlas Connection Error: ${error.message}`);
+    if (error.message.includes('whitelisted') || error.message.includes('Could not connect to any servers')) {
+      console.error(`\n-----------------------------------------------------------`);
+      console.error(`⚠️  HOW TO FIX: MongoDB Atlas IP Whitelist (1 Minute Fix)`);
+      console.error(`1. Open https://cloud.mongodb.com and log in`);
+      console.error(`2. Left Menu -> Security -> Network Access`);
+      console.error(`3. Click "+ ADD IP ADDRESS"`);
+      console.error(`4. Click "ALLOW ACCESS FROM ANYWHERE" (0.0.0.0/0)`);
+      console.error(`5. Click "Confirm" (takes ~30s to activate)`);
+      console.error(`-----------------------------------------------------------\n`);
     }
-    throw error;
   }
 };
 

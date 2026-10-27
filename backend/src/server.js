@@ -19,6 +19,16 @@ const server = http.createServer(app);
 // Initialize Socket.io
 initSocket(server);
 
+// Handle server errors gracefully (e.g. port already in use)
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Port ${PORT} is already in use by another process!`);
+    console.error(`👉 Run in terminal: npx kill-port ${PORT} (or Stop-Process) to free the port.`);
+  } else {
+    console.error('❌ Server startup error:', err);
+  }
+});
+
 // Only listen locally or in long-running container (not on Vercel serverless)
 if (!process.env.VERCEL) {
   server.listen(PORT, () => {

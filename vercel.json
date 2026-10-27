@@ -19,6 +19,18 @@
       "dest": "/backend/src/server.js"
     },
     {
+      "src": "/auth/(.*)",
+      "dest": "/backend/src/server.js"
+    },
+    {
+      "src": "/tags/(.*)",
+      "dest": "/backend/src/server.js"
+    },
+    {
+      "src": "/alerts/(.*)",
+      "dest": "/backend/src/server.js"
+    },
+    {
       "src": "/socket.io/(.*)",
       "dest": "/backend/src/server.js"
     },
@@ -27,7 +39,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/index.html"
+      "dest": "/index.html"
     }
   ]
 }

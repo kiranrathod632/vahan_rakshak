@@ -1,0 +1,17 @@
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+
+
+# Vercel deployment cache
+.vercel/
+!.vercel/project.json
+
+
+

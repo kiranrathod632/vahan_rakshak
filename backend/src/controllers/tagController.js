@@ -1,0 +1,507 @@
+const QRCode = require('qrcode');
+const crypto = require('crypto');
+const Tag = require('../models/Tag');
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const { checkDocumentExpiryStatus } = require('../services/notificationService');
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'gadiraksha_secret', {
+    expiresIn: process.env.JWT_EXPIRES_IN || '30d'
+  });
+};
+
+/**
+ * @desc    Batch generate physical QR tags for printing stickers (Admin)
+ * @route   POST /api/tags/batch-generate
+ * @access  Private (Admin or Admin-Key)
+ */
+const batchGenerateTags = async (req, res, next) => {
+  try {
+    const { count = 10, prefix = 'GR' } = req.body;
+    const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+
+    const tagsCreated = [];
+
+    for (let i = 0; i < Number(count); i++) {
+      let unique = false;
+      let tagCode = '';
+
+      // Ensure uniqueness
+      while (!unique) {
+        const randomPart = Math.floor(10000 + Math.random() * 90000);
+        tagCode = `${prefix}-${randomPart}`;
+        const existing = await Tag.findOne({ tagCode });
+        if (!existing) unique = true;
+      }
+
+      const scanUrl = `${clientBaseUrl}/scan/${tagCode}`;
+      const qrDataUrl = await QRCode.toDataURL(scanUrl, {
+        errorCorrectionLevel: 'H',
+        margin: 2,
+        width: 300,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+
+      const newTag = await Tag.create({
+        tagCode,
+        qrUrl: scanUrl,
+        qrImageBase64: qrDataUrl,
+        status: 'UNCLAIMED'
+      });
+
+      tagsCreated.push({
+        tagCode: newTag.tagCode,
+        qrUrl: newTag.qrUrl,
+        qrImageBase64: newTag.qrImageBase64
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully generated ${tagsCreated.length} QR tags ready for printing`,
+      count: tagsCreated.length,
+      data: tagsCreated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    1-Step: Register new user + Claim sticker + Add 3-4 Family Contacts + Vehicle Docs
+ * @route   POST /api/tags/register-and-claim
+ * @access  Public
+ */
+const registerAndClaim = async (req, res, next) => {
+  try {
+    const {
+      tagCode,
+      name,
+      phone,
+      password,
+      profilePic,
+      gender,
+      bloodGroup,
+      weight,
+      height,
+      address,
+      medicalNotes,
+      vehicleNumber,
+      vehicleType,
+      vehicleModel,
+      vehicleColor,
+      emergencyContacts, // Array of 3-4 contacts [{ name, relation, phone }]
+      puc, // { docNumber, validUntil, documentUrl }
+      insurance, // { docNumber, companyName, validUntil }
+      purchaseInfo // { isPaid, amountPaid, plan }
+    } = req.body;
+
+    if (!tagCode || !name || !phone || !password || !vehicleNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: tagCode, name, phone, password, and vehicleNumber are required.'
+      });
+    }
+
+    const cleanTagCode = tagCode.trim().toUpperCase();
+    let tag = await Tag.findOne({ tagCode: cleanTagCode });
+
+    // Pre-printed Physical Scanner support:
+    // If the scanner sticker was pre-printed before being in DB, auto-create it as UNCLAIMED
+    if (!tag) {
+      const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+      tag = new Tag({
+        tagCode: cleanTagCode,
+        qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,
+        status: 'UNCLAIMED'
+      });
+    }
+
+    if (tag.status === 'ACTIVE' && tag.user) {
+      return res.status(400).json({
+        success: false,
+        message: 'This sticker has already been activated by another user.'
+      });
+    }
+
+    // Process 3-4 emergency contacts
+    let contactsList = [];
+    if (Array.isArray(emergencyContacts)) {
+      contactsList = emergencyContacts.slice(0, 5).map((c, index) => ({
+        name: c.name,
+        relation: c.relation || 'Relative',
+        phone: c.phone,
+        priorityOrder: index + 1,
+        isPrimary: index === 0
+      }));
+    }
+
+    const formattedAddress = typeof address === 'string'
+      ? { fullAddress: address, city: '', state: 'Maharashtra', pincode: '' }
+      : (address || {});
+
+    // Check or create user with new demographics (gender, weight, height, address, profilePic)
+    let user = await User.findOne({ phone });
+
+    if (!user) {
+      user = await User.create({
+        name,
+        phone,
+        password,
+        profilePic: profilePic || undefined,
+        gender: gender || 'Male',
+        bloodGroup: bloodGroup || 'Unknown',
+        weight: weight ? Number(weight) : null,
+        height: height || '',
+        address: formattedAddress,
+        medicalNotes: medicalNotes || '',
+        emergencyContacts: contactsList
+      });
+    } else {
+      // If user exists, update their profile with any provided details
+      if (gender) user.gender = gender;
+      if (bloodGroup) user.bloodGroup = bloodGroup;
+      if (weight) user.weight = Number(weight);
+      if (height) user.height = height;
+      if (profilePic) user.profilePic = profilePic;
+      if (address) user.address = formattedAddress;
+      if (contactsList.length > 0) user.emergencyContacts = contactsList;
+      await user.save();
+    }
+
+    // Attach tag
+    tag.user = user._id;
+    tag.status = 'ACTIVE';
+    tag.claimedAt = new Date();
+    tag.vehicleDetails = {
+      vehicleNumber: vehicleNumber.toUpperCase().trim(),
+      vehicleType: vehicleType || 'Four-Wheeler',
+      vehicleModel: vehicleModel || '',
+      vehicleColor: vehicleColor || ''
+    };
+
+    // Record purchase and validity (e.g. 1 year subscription)
+    tag.purchaseInfo = {
+      isPaid: purchaseInfo?.isPaid !== false,
+      paymentStatus: purchaseInfo?.paymentStatus || 'PAID',
+      plan: purchaseInfo?.plan || '1_YEAR_STANDARD',
+      amountPaid: purchaseInfo?.amountPaid || 299,
+      purchasedAt: new Date(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+    };
+
+    // Save initial vehicle documents if provided
+    if (puc && puc.docNumber) {
+      tag.documents.puc = {
+        docNumber: puc.docNumber,
+        validUntil: puc.validUntil ? new Date(puc.validUntil) : null,
+        documentUrl: puc.documentUrl || ''
+      };
+    }
+
+    if (insurance && insurance.docNumber) {
+      tag.documents.insurance = {
+        docNumber: insurance.docNumber,
+        companyName: insurance.companyName || '',
+        validUntil: insurance.validUntil ? new Date(insurance.validUntil) : null,
+        documentUrl: insurance.documentUrl || ''
+      };
+    }
+
+    await tag.save();
+
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Account created, vehicle documents saved, and sticker activated successfully!',
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          phone: user.phone,
+          bloodGroup: user.bloodGroup,
+          emergencyContacts: user.emergencyContacts
+        },
+        tag,
+        token
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update vehicle documents (PUC, Insurance, RC, Fitness)
+ * @route   PUT /api/tags/:tagCode/documents
+ * @access  Private (Vehicle Owner)
+ */
+const updateVehicleDocuments = async (req, res, next) => {
+  try {
+    const { tagCode } = req.params;
+    const { puc, insurance, rc, fitness, showDocsOnScan } = req.body;
+
+    const tag = await Tag.findOne({ tagCode: tagCode.toUpperCase(), user: req.user._id });
+    if (!tag) {
+      return res.status(404).json({ success: false, message: 'Tag not found or unauthorized' });
+    }
+
+    // Update PUC
+    if (puc) {
+      tag.documents.puc = {
+        docNumber: puc.docNumber || tag.documents.puc?.docNumber || '',
+        validUntil: puc.validUntil ? new Date(puc.validUntil) : tag.documents.puc?.validUntil,
+        documentUrl: puc.documentUrl || tag.documents.puc?.documentUrl || ''
+      };
+    }
+
+    // Update Insurance
+    if (insurance) {
+      tag.documents.insurance = {
+        docNumber: insurance.docNumber || tag.documents.insurance?.docNumber || '',
+        companyName: insurance.companyName || tag.documents.insurance?.companyName || '',
+        validUntil: insurance.validUntil ? new Date(insurance.validUntil) : tag.documents.insurance?.validUntil,
+        documentUrl: insurance.documentUrl || tag.documents.insurance?.documentUrl || ''
+      };
+    }
+
+    // Update RC
+    if (rc) {
+      tag.documents.rc = {
+        docNumber: rc.docNumber || tag.documents.rc?.docNumber || '',
+        validUntil: rc.validUntil ? new Date(rc.validUntil) : tag.documents.rc?.validUntil,
+        documentUrl: rc.documentUrl || tag.documents.rc?.documentUrl || ''
+      };
+    }
+
+    // Update Fitness
+    if (fitness) {
+      tag.documents.fitness = {
+        docNumber: fitness.docNumber || tag.documents.fitness?.docNumber || '',
+        validUntil: fitness.validUntil ? new Date(fitness.validUntil) : tag.documents.fitness?.validUntil,
+        documentUrl: fitness.documentUrl || tag.documents.fitness?.documentUrl || ''
+      };
+    }
+
+    if (showDocsOnScan !== undefined) {
+      tag.privacySettings.showDocsOnScan = showDocsOnScan;
+    }
+
+    await tag.save();
+
+    const expiryStatus = checkDocumentExpiryStatus(tag.documents);
+
+    res.json({
+      success: true,
+      message: 'Vehicle documents updated successfully',
+      data: {
+        documents: tag.documents,
+        showDocsOnScan: tag.privacySettings.showDocsOnScan,
+        documentExpiryStatus: expiryStatus
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Record or update purchase / subscription payment status
+ * @route   PUT /api/tags/:tagCode/purchase
+ * @access  Private (Admin or Authenticated Owner on Payment Gateway success)
+ */
+const updatePurchaseStatus = async (req, res, next) => {
+  try {
+    const { tagCode } = req.params;
+    const { isPaid, paymentStatus, plan, amountPaid, transactionId, validityMonths = 12 } = req.body;
+
+    const tag = await Tag.findOne({ tagCode: tagCode.toUpperCase() });
+    if (!tag) {
+      return res.status(404).json({ success: false, message: 'Tag not found' });
+    }
+
+    const now = new Date();
+    const validUntilDate = new Date(now.getTime() + validityMonths * 30 * 24 * 60 * 60 * 1000);
+
+    tag.purchaseInfo = {
+      isPaid: isPaid !== false,
+      paymentStatus: paymentStatus || 'PAID',
+      plan: plan || '1_YEAR_STANDARD',
+      amountPaid: amountPaid !== undefined ? Number(amountPaid) : tag.purchaseInfo.amountPaid,
+      purchasedAt: now,
+      validUntil: validUntilDate,
+      transactionId: transactionId || `TXN-${Date.now()}`
+    };
+
+    await tag.save();
+
+    res.json({
+      success: true,
+      message: `Purchase status updated for tag ${tag.tagCode}`,
+      data: tag.purchaseInfo
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get user's vehicle tags with document status & purchase info
+ * @route   GET /api/tags/my-tags
+ * @access  Private
+ */
+const getMyTags = async (req, res, next) => {
+  try {
+    const tags = await Tag.find({ user: req.user._id }).sort({ createdAt: -1 });
+
+    const enriched = tags.map((t) => {
+      const docExpiry = checkDocumentExpiryStatus(t.documents);
+      const isSubActive = t.purchaseInfo?.isPaid && (!t.purchaseInfo.validUntil || new Date() <= new Date(t.purchaseInfo.validUntil));
+      return {
+        ...t.toObject(),
+        isSubscriptionActive: isSubActive,
+        documentExpiryStatus: docExpiry
+      };
+    });
+
+    res.json({
+      success: true,
+      count: enriched.length,
+      data: enriched
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Claim an existing tag (for logged in user)
+ * @route   POST /api/tags/claim
+ * @access  Private
+ */
+const claimTag = async (req, res, next) => {
+  try {
+    const { tagCode, vehicleNumber, vehicleType, vehicleModel, vehicleColor } = req.body;
+
+    if (!tagCode || !vehicleNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide Tag Code and Vehicle Number'
+      });
+    }
+
+    const cleanTagCode = tagCode.trim().toUpperCase();
+    const tag = await Tag.findOne({ tagCode: cleanTagCode });
+
+    if (!tag) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid Tag Code. Please check the code on your sticker.'
+      });
+    }
+
+    if (tag.status === 'ACTIVE' && tag.user) {
+      return res.status(400).json({
+        success: false,
+        message: 'This tag is already claimed and registered to another vehicle.'
+      });
+    }
+
+    tag.user = req.user._id;
+    tag.status = 'ACTIVE';
+    tag.claimedAt = new Date();
+    tag.vehicleDetails = {
+      vehicleNumber: vehicleNumber.toUpperCase().trim(),
+      vehicleType: vehicleType || 'Four-Wheeler',
+      vehicleModel: vehicleModel || '',
+      vehicleColor: vehicleColor || ''
+    };
+
+    tag.purchaseInfo = {
+      isPaid: true,
+      paymentStatus: 'PAID',
+      plan: '1_YEAR_STANDARD',
+      amountPaid: 299,
+      purchasedAt: new Date(),
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+    };
+
+    await tag.save();
+
+    res.json({
+      success: true,
+      message: `Tag ${tag.tagCode} successfully linked to vehicle ${vehicleNumber.toUpperCase()}`,
+      data: tag
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Check if a physical sticker code is valid and available for first-time claiming
+ * @route   GET /api/tags/check/:tagCode
+ * @access  Public
+ */
+const checkTagAvailability = async (req, res, next) => {
+  try {
+    const { tagCode } = req.params;
+    if (!tagCode || !tagCode.trim()) {
+      return res.status(400).json({
+        success: false,
+        available: false,
+        message: 'Please provide a valid sticker code'
+      });
+    }
+
+    const cleanTagCode = tagCode.trim().toUpperCase();
+    const tag = await Tag.findOne({ tagCode: cleanTagCode });
+
+    if (!tag || tag.status === 'UNCLAIMED' || !tag.user) {
+      return res.json({
+        success: true,
+        available: true,
+        isFirstTimeScan: true,
+        tagCode: cleanTagCode,
+        status: tag ? tag.status : 'UNCLAIMED',
+        message: `Sticker "${cleanTagCode}" is fresh and available! On your first scan/registration, it will belong exclusively to your vehicle.`
+      });
+    }
+
+    if (tag.status === 'ACTIVE' && tag.user) {
+      return res.json({
+        success: false,
+        available: false,
+        isFirstTimeScan: false,
+        tagCode: cleanTagCode,
+        status: 'CLAIMED',
+        message: `This unique sticker code "${cleanTagCode}" has already been claimed by another vehicle owner.`
+      });
+    }
+
+    return res.json({
+      success: false,
+      available: false,
+      tagCode: cleanTagCode,
+      status: tag.status,
+      message: `Sticker code "${cleanTagCode}" is currently ${tag.status.toLowerCase()}.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  batchGenerateTags,
+  registerAndClaim,
+  updateVehicleDocuments,
+  updatePurchaseStatus,
+  getMyTags,
+  claimTag,
+  checkTagAvailability
+};

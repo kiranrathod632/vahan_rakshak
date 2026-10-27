@@ -233,6 +233,23 @@ const register = async (req, res, next) => {
         createdVehicle.tag = linkedTag._id;
         await createdVehicle.save();
       }
+    } else if (providedTagCode) {
+      // If tagCode provided without vehicleNumber yet, bind the QR scanner to this user
+      linkedTag = existingTagForValidation || await Tag.findOne({ tagCode: providedTagCode });
+
+      if (!linkedTag) {
+        const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+        linkedTag = new Tag({
+          tagCode: providedTagCode,
+          qrUrl: `${clientBaseUrl}/scan/${providedTagCode}`,
+          status: 'UNCLAIMED'
+        });
+      }
+
+      linkedTag.user = user._id;
+      linkedTag.status = 'ACTIVE';
+      linkedTag.claimedAt = new Date();
+      await linkedTag.save();
     }
 
     const token = generateToken(user._id);
@@ -370,7 +387,13 @@ const addVehicle = async (req, res, next) => {
     }
 
     const user = await User.findById(req.user._id);
-    const cleanTagCode = (tagCode || '').toUpperCase().trim();
+    let cleanTagCode = (tagCode || '').toUpperCase().trim();
+    if (!cleanTagCode) {
+      const pendingTag = await Tag.findOne({ user: user._id, vehicle: null, status: 'ACTIVE' });
+      if (pendingTag) {
+        cleanTagCode = pendingTag.tagCode;
+      }
+    }
 
     // Create in separate Vehicle model
     const newVehicle = await Vehicle.create({

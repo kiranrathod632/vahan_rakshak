@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-do
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import PlateBadge from '../components/PlateBadge';
+import CameraQRScanner from '../components/CameraQRScanner';
 import {
   Shield,
   QrCode,
@@ -350,86 +351,13 @@ export default function ActivateWizard() {
                 </p>
               </div>
 
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 text-white space-y-4 text-center">
-                <div className="size-16 rounded-2xl bg-white/10 text-amber-400 border border-white/10 grid place-items-center mx-auto text-3xl">
-                  📦
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-amber-300 mb-1">
-                    Enter Physical Sticker Code:
-                  </label>
-                  <p className="text-[11px] text-slate-400 mb-2">
-                    Har QR scanner unique code ke saath aata hai. First scan ya registration pe vo permanently aapka hojayga.
-                  </p>
-                  <div className="flex max-w-xs mx-auto gap-2">
-                    <input
-                      type="text"
-                      required
-                      value={formData.tagCode}
-                      onChange={(e) => {
-                        const code = e.target.value.toUpperCase();
-                        setFormData({ ...formData, tagCode: code });
-                        setTagStatus(null);
-                      }}
-                      onBlur={() => {
-                        if (formData.tagCode.trim()) checkTagCode(formData.tagCode);
-                      }}
-                      placeholder="e.g. MH-1001 or GR-5520"
-                      className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2.5 text-center text-sm font-mono uppercase font-black text-amber-400 tracking-widest focus:border-amber-500 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => checkTagCode(formData.tagCode)}
-                      disabled={checkingTag || !formData.tagCode.trim()}
-                      className="px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0"
-                    >
-                      {checkingTag ? <RefreshCw className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-                      <span>Verify</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tag Live Status Feedback */}
-                {tagStatus && (
-                  <div
-                    className={`p-2.5 rounded-xl text-xs font-semibold mx-auto max-w-sm flex items-center justify-center gap-2 border ${
-                      tagStatus.available
-                        ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
-                        : 'bg-rose-950/60 text-rose-300 border-rose-800'
-                    }`}
-                  >
-                    {tagStatus.available ? (
-                      <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
-                    ) : (
-                      <AlertTriangle className="size-4 shrink-0 text-rose-400" />
-                    )}
-                    <span>{tagStatus.message}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, tagCode: 'MH-1001' });
-                      checkTagCode('MH-1001');
-                    }}
-                    className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-mono font-semibold text-slate-200"
-                  >
-                    Sample: MH-1001
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, tagCode: 'GR-8840' });
-                      checkTagCode('GR-8840');
-                    }}
-                    className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-mono font-semibold text-slate-200"
-                  >
-                    Sample: GR-8840
-                  </button>
-                </div>
-              </div>
+              <CameraQRScanner
+                initialCode={formData.tagCode}
+                onScanSuccess={(code, status) => {
+                  setFormData((prev) => ({ ...prev, tagCode: code }));
+                  setTagStatus(status);
+                }}
+              />
 
               <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-[11px] text-amber-900 dark:text-amber-300 space-y-1">
                 <span className="font-bold flex items-center gap-1.5">

@@ -5,7 +5,7 @@ const dns = require('dns');
 try {
   dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1','0.0.0.0']);
 } catch (e) {
-  // Fallback to system default if not supported
+ 
 }
 
 // Reduce buffer timeout so requests fail fast with clear message instead of hanging

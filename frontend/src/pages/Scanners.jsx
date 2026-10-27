@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import StatusBadge from '../components/StatusBadge';
 import PlateBadge from '../components/PlateBadge';
 import {
@@ -105,7 +106,7 @@ export default function Scanners() {
   const handleBatchGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await fetch('/api/tags/batch-generate', {
+      const res = await fetch(apiUrl('/api/tags/batch-generate'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

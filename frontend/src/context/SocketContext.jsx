@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { API_BASE_URL } from '../utils/api';
 
 const SocketContext = createContext();
 
@@ -12,8 +13,9 @@ export const SocketProvider = ({ children }) => {
   const [recentAlerts, setRecentAlerts] = useState([]);
 
   useEffect(() => {
-    // Initialize socket connection
-    const newSocket = io(window.location.origin, {
+    // Initialize socket connection using backend API URL if configured
+    const socketHost = API_BASE_URL || window.location.origin;
+    const newSocket = io(socketHost, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000

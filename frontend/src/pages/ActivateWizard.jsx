@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import PlateBadge from '../components/PlateBadge';
 import CameraQRScanner from '../components/CameraQRScanner';
+import { apiUrl } from '../utils/api';
 import {
   Shield,
   QrCode,
@@ -84,7 +85,7 @@ export default function ActivateWizard() {
     }
     setCheckingTag(true);
     try {
-      const res = await fetch(`/api/tags/check/${encodeURIComponent(cleanCode)}`);
+      const res = await fetch(apiUrl(`/api/tags/check/${encodeURIComponent(cleanCode)}`));
       const data = await res.json();
       setTagStatus(data);
     } catch (err) {
@@ -174,7 +175,7 @@ export default function ActivateWizard() {
     };
 
     try {
-      const res = await fetch('/api/tags/register-and-claim', {
+      const res = await fetch(apiUrl('/api/tags/register-and-claim'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

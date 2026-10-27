@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { apiUrl } from '../utils/api';
 import PlateBadge from '../components/PlateBadge';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -226,7 +227,7 @@ export default function AdminDashboard() {
       'X-ADMIN-KEY': ADMIN_SECRET,
       ...(options.headers || {})
     };
-    return fetch(url, { ...options, headers });
+    return fetch(apiUrl(url), { ...options, headers });
   };
 
   // Load all admin data

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { apiUrl } from '../utils/api';
 import PlateBadge from '../components/PlateBadge';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -91,7 +92,7 @@ export default function PublicScan() {
 
     const fetchScan = async () => {
       try {
-        const res = await fetch(`/api/scan/${tagCode}`);
+        const res = await fetch(apiUrl(`/api/scan/${tagCode}`));
         const data = await res.json();
         if (data.success) {
           setScanData(data);
@@ -128,7 +129,7 @@ export default function PublicScan() {
         scannerName: 'Concerned Citizen'
       };
 
-      const res = await fetch(`/api/scan/${tagCode}/alert`, {
+      const res = await fetch(apiUrl(`/api/scan/${tagCode}/alert`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -193,7 +194,7 @@ export default function PublicScan() {
         if (data.success) {
           setClaimSuccessMsg(data.message || 'Scanner claimed successfully!');
           setTimeout(async () => {
-            const freshRes = await fetch(`/api/scan/${tagCode}`);
+            const freshRes = await fetch(apiUrl(`/api/scan/${tagCode}`));
             const freshData = await freshRes.json();
             if (freshData.success) {
               setScanData(freshData);

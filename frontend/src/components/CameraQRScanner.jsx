@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { apiUrl } from '../utils/api';
 import {
   Camera,
   FlipHorizontal,
@@ -199,7 +200,7 @@ export default function CameraQRScanner({ onScanSuccess, initialCode = '' }) {
     setVerificationResult(null);
 
     try {
-      const res = await fetch(`/api/tags/check/${encodeURIComponent(code)}`);
+      const res = await fetch(apiUrl(`/api/tags/check/${encodeURIComponent(code)}`));
       const data = await res.json();
       setVerificationResult(data);
 

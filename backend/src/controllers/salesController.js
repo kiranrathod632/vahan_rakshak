@@ -353,6 +353,13 @@ const updateCustomer = async (req, res, next) => {
     if (email !== undefined) user.email = email ? email.trim() : null;
     if (bloodGroup) user.bloodGroup = bloodGroup;
     if (medicalNotes !== undefined) user.medicalNotes = medicalNotes;
+    if (req.body.status) {
+      user.status = req.body.status;
+      user.isActive = req.body.status === 'ACTIVE';
+    } else if (req.body.isActive !== undefined) {
+      user.isActive = req.body.isActive;
+      user.status = req.body.isActive ? 'ACTIVE' : 'BLOCKED';
+    }
     
     if (fullAddress !== undefined || city !== undefined || state !== undefined || pincode !== undefined) {
       user.address = {

@@ -5,8 +5,10 @@ import { useSocket } from '../context/SocketContext';
 import { apiUrl } from '../utils/api';
 import PlateBadge from '../components/PlateBadge';
 import StatusBadge from '../components/StatusBadge';
+import AdminOverview from '../components/AdminOverview';
 import {
   Users,
+  LayoutDashboard,
   UserCheck,
   UserX,
   Plus,
@@ -63,7 +65,7 @@ export default function AdminDashboard() {
 
   // Master Portal Switcher: 'users' (User Portal) | 'sales' (Sales Team Portal)
   const rawPortal = searchParams.get('portal');
-  const rawTab = searchParams.get('tab') || 'users';
+  const rawTab = searchParams.get('tab') || 'overview';
 
   const portalMode = rawPortal
     ? rawPortal
@@ -80,7 +82,7 @@ export default function AdminDashboard() {
   // Active Tab synchronized with URL search param
   const activeTab = ['users', 'team', 'scanners', 'emergencies', 'growth', 'overview'].includes(rawTab)
     ? rawTab
-    : (portalMode === 'sales' ? 'team' : 'users');
+    : (portalMode === 'sales' ? 'team' : 'overview');
 
   const setActiveTab = (tab) => {
     const portal = tab === 'team' ? 'sales' : 'users';
@@ -96,7 +98,19 @@ export default function AdminDashboard() {
   const [emergencies, setEmergencies] = useState([]);
   const [teamReports, setTeamReports] = useState([]);
 
-  // Search & Filters for Users
+  // Master Management Sub-tab (QR Generate vs Salary & Incentives per QR)
+  const [masterSubTab, setMasterSubTab] = useState(searchParams.get('sub') === 'incentives' ? 'incentives' : 'qr');
+  const [selectedStaffForRule, setSelectedStaffForRule] = useState('');
+  const [customIncentiveForm, setCustomIncentiveForm] = useState({
+    baseSalary: 15000,
+    incentivePerScanner: 100,
+    monthlyTarget: 50
+  });
+
+  // Search & Filters for Users & Vehicles
+  const [userSubTab, setUserSubTab] = useState(searchParams.get('sub') || 'users');
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState(searchParams.get('vstatus') || 'ALL');
   const [userSearch, setUserSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'BLOCKED'
   const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL' | 'user' | 'sales' | 'admin'
@@ -259,6 +273,27 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadAllData();
   }, []);
+
+  // React to URL parameters & commands
+  useEffect(() => {
+    const action = searchParams.get('action');
+    const status = searchParams.get('status');
+    const vstatus = searchParams.get('vstatus');
+    const tstatus = searchParams.get('tstatus');
+    const sub = searchParams.get('sub');
+    if (action === 'add_user') setAddUserModalOpen(true);
+    if (action === 'add_team') setAddTeamModalOpen(true);
+    if (status) setStatusFilter(status);
+    if (vstatus) {
+      setUserSubTab('vehicles');
+      setVehicleStatusFilter(vstatus);
+    }
+    if (tstatus) setTeamStatusFilter(tstatus);
+    if (sub) {
+      if (sub === 'incentives' || sub === 'qr') setMasterSubTab(sub);
+      setUserSubTab(sub);
+    }
+  }, [searchParams]);
 
   // ---------------- USER ACTIONS ---------------- //
 
@@ -1082,6 +1117,66 @@ export default function AdminDashboard() {
     return matchSearch && matchStatus && matchRole;
   });
 
+  // Flattened Vehicles List across all owners for Master Vehicles Management
+  const allVehicles = displayUsers.flatMap((u) => {
+    const list = (u.vehicles && u.vehicles.length > 0)
+      ? u.vehicles
+      : (u.primaryVehicle ? [u.primaryVehicle] : []);
+    
+    return list.map((v, idx) => ({
+      _id: v._id || `${u._id}_v_${idx}`,
+      vehicleNumber: v.vehicleNumber || v.registrationNumber || u.vehicleNumber || 'MH19 AB 1234',
+      vehicleModel: v.vehicleModel || v.model || 'Honda Activa 6G',
+      vehicleType: v.vehicleType || v.type || 'Two Wheeler',
+      tagCode: v.tagCode || v.tagId || u.tagCode || 'MH-1001',
+      status: v.status || (u.status === 'BLOCKED' ? 'BLOCKED' : 'ACTIVE'),
+      isActive: v.isActive !== false && u.status !== 'BLOCKED',
+      ownerName: u.name || 'Vehicle Owner',
+      ownerPhone: u.phone || '',
+      ownerEmail: u.email || '',
+      ownerUser: u
+    }));
+  });
+
+  const filteredVehicles = allVehicles.filter(v => {
+    const q = vehicleSearch.toLowerCase();
+    const matchSearch =
+      !vehicleSearch ||
+      (v.vehicleNumber && v.vehicleNumber.toLowerCase().includes(q)) ||
+      (v.vehicleModel && v.vehicleModel.toLowerCase().includes(q)) ||
+      (v.ownerName && v.ownerName.toLowerCase().includes(q)) ||
+      (v.tagCode && v.tagCode.toLowerCase().includes(q));
+
+    const matchStatus =
+      vehicleStatusFilter === 'ALL' ||
+      (vehicleStatusFilter === 'ACTIVE' && v.isActive) ||
+      (vehicleStatusFilter === 'BLOCKED' && !v.isActive);
+
+    return matchSearch && matchStatus;
+  });
+
+  const activeVehiclesCount = allVehicles.filter(v => v.isActive).length;
+  const blockedVehiclesCount = allVehicles.filter(v => !v.isActive).length;
+
+  const handleToggleVehicleBlock = (vehicle) => {
+    const newStatus = vehicle.isActive ? 'BLOCKED' : 'ACTIVE';
+    setUsers(prev => prev.map(u => {
+      if (u._id === vehicle.ownerUser?._id) {
+        const updatedVehicles = (u.vehicles || []).map(v =>
+          ((v.vehicleNumber || v.registrationNumber) === vehicle.vehicleNumber ? { ...v, status: newStatus, isActive: newStatus === 'ACTIVE' } : v)
+        );
+        return {
+          ...u,
+          vehicles: updatedVehicles,
+          primaryVehicle: (u.primaryVehicle?.vehicleNumber === vehicle.vehicleNumber)
+            ? { ...u.primaryVehicle, status: newStatus, isActive: newStatus === 'ACTIVE' }
+            : u.primaryVehicle
+        };
+      }
+      return u;
+    }));
+  };
+
   const displayTeam = teamMembers.length > 0 ? teamMembers : [
     {
       _id: 't_m1',
@@ -1167,6 +1262,7 @@ export default function AdminDashboard() {
   // Team summary metrics
   const totalStaffCount = displayTeam.length;
   const activeStaffCount = displayTeam.filter(m => m.status === 'ACTIVE').length;
+  const blockedStaffCount = displayTeam.filter(m => m.status === 'BLOCKED' || m.isActive === false).length;
   const totalStaffSales = displayTeam.reduce((sum, m) => sum + (m.totalSalesCount || 0), 0);
   const totalStaffCommission = displayTeam.reduce((sum, m) => sum + (m.totalCommissionEarned || ((m.totalSalesCount || 0) * (m.salaryOrCommissionRate || 100))), 0);
 
@@ -1180,507 +1276,479 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* 
-     
-
-      {/* 
-        ========================================================================
-        1. BANNER (DYNAMIC TO SELECTED PORTAL)
-        ========================================================================
-      */}
-      {portalMode === 'users' ? (
-        /* USER PORTAL BANNER */
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-900 via-brand-800 to-brand-950 p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 size-48 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-8 -left-8 size-40 rounded-full bg-brand-400/10 blur-xl pointer-events-none" />
-
-
-
-          <div className="relative z-10 flex flex-wrap gap-2.5">
-            <button
-              onClick={() => setAddUserModalOpen(true)}
-              className="btn-primary !bg-white !text-brand-900 hover:!bg-brand-50 shadow-md font-bold text-xs"
-            >
-              <Plus className="size-4 text-brand-700" />
-              <span>+ Add New User</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('scanners')}
-              className="btn-secondary !bg-brand-800/60 !border-brand-700 !text-white hover:!bg-brand-800 text-xs font-semibold"
-            >
-              <QrCode className="size-4" />
-              <span>QR Inventory</span>
-            </button>
-          </div>
-        </div>
+      {activeTab === 'overview' ? (
+        <AdminOverview
+          user={user}
+          stats={stats}
+          users={displayUsers}
+          team={displayTeam}
+          scanners={scanners}
+          emergencies={emergencies}
+          setActiveTab={setActiveTab}
+          onAddUser={() => setAddUserModalOpen(true)}
+          onAddTeam={() => setAddTeamModalOpen(true)}
+        />
       ) : (
-        /* SALES TEAM PORTAL BANNER */
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-950 via-brand-900 to-slate-950 p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 size-48 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-8 -left-8 size-40 rounded-full bg-emerald-400/10 blur-xl pointer-events-none" />
-
-
-
-          <div className="relative z-10 flex flex-wrap gap-2.5">
-            <button
-              onClick={() => setAddTeamModalOpen(true)}
-              className="btn-primary !bg-white !text-emerald-950 hover:!bg-emerald-50 shadow-md font-bold text-xs"
-            >
-              <UserPlus className="size-4 text-emerald-700" />
-              <span>+ Hire Team Member</span>
-            </button>
-            <a
-              href="/sales"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary !bg-emerald-900/60 !border-emerald-700 !text-white hover:!bg-emerald-900 text-xs font-semibold inline-flex items-center gap-1.5"
-            >
-              <span>Open Live Staff Portal</span>
-              <ExternalLink className="size-3.5" />
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* 
-        ========================================================================
-        2. 4 METRIC KPI CARDS (DYNAMIC TO SELECTED PORTAL)
-        ========================================================================
-      */}
-      {portalMode === 'users' ? (
-        /* USER PORTAL 4 KPI CARDS */
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Total Users */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Total Users
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400">
-                <Users className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-                {totalUserCount}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">registered</span>
-            </div>
-            <p className="mt-2 text-xs text-brand-600 dark:text-brand-400 font-medium flex items-center gap-1">
-              <TrendingUp className="size-3.5" />
-              <span>All Vehicle Owners</span>
-            </p>
-          </div>
-
-          {/* Card 2: Active Users */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Active Users
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                <UserCheck className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-                {activeUserCount}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                ({blockedUserCount} blocked)
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-              <CheckCircle2 className="size-3.5" />
-              <span>Verified & Protected</span>
-            </p>
-          </div>
-
-          {/* Card 3: Monthly Growth */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Monthly Growth
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                <TrendingUp className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-                {growthRate}
-              </span>
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">MoM</span>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Rapid user adoption
-            </p>
-          </div>
-
-          {/* Card 4: Fleet & Scanners */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Active Scanners
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                <QrCode className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-                {activeScannersCount}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">of {totalVehicles} fleet</span>
-            </div>
-            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-medium">
-              Pre-printed stickers active
-            </p>
-          </div>
-        </div>
-      ) : (
-        /* SALES TEAM PORTAL 4 KPI CARDS */
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Total Staff */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Total Staff
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                <Briefcase className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-                {totalStaffCount}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">members</span>
-            </div>
-            <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-              <UserCheck className="size-3.5" />
-              <span>{activeStaffCount} Active on Field</span>
-            </p>
-          </div>
-
-          {/* Card 2: Total Customers Onboarded by Team */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Team Onboardings
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                <QrCode className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-                {totalStaffSales}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">customers</span>
-            </div>
-            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-medium">
-              Stickers distributed by staff
-            </p>
-          </div>
-
-          {/* Card 3: Monthly Target Progress */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Team Target Goal
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                <TrendingUp className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-purple-600 dark:text-purple-400">
-                {Math.min(100, Math.round((totalStaffSales / (Math.max(1, displayTeam.length) * 50)) * 100))}%
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">of goal</span>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              Monthly quota progress
-            </p>
-          </div>
-
-          {/* Card 4: Total Commission Payout */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Team Commissions
-              </span>
-              <div className="grid size-9 place-items-center rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                <Banknote className="size-4.5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-display font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
-                ₹{totalStaffCommission.toLocaleString('en-IN')}
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-              Verified bank settlements
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 
-        ========================================================================
-        3. SUB-TAB NAVIGATION BAR (RELEVANT TO ACTIVE PORTAL)
-        ========================================================================
-      */}
-      {portalMode === 'users' ? (
-        /* USER PORTAL SUB-TABS */
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200 dark:border-[#1f2333]">
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'users'
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'bg-white dark:bg-[#12141e] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] border border-slate-200 dark:border-[#1f2333]'
-              }`}
-          >
-            <Users className="size-4" />
-            <span>Vehicle Users Hub ({filteredUsers.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('scanners')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'scanners'
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'bg-white dark:bg-[#12141e] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] border border-slate-200 dark:border-[#1f2333]'
-              }`}
-          >
-            <QrCode className="size-4" />
-            <span>QR Stickers Inventory ({scanners.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('emergencies')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'emergencies'
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'bg-white dark:bg-[#12141e] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] border border-slate-200 dark:border-[#1f2333]'
-              }`}
-          >
-            <ShieldAlert className="size-4" />
-            <span>Emergency SOS Logs ({emergencies.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('growth')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'growth'
-                ? 'bg-brand-600 text-white shadow-sm'
-                : 'bg-white dark:bg-[#12141e] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] border border-slate-200 dark:border-[#1f2333]'
-              }`}
-          >
-            <TrendingUp className="size-4" />
-            <span>Monthly Growth & Stats</span>
-          </button>
-        </div>
-      ) : (
-        /* SALES TEAM PORTAL SUB-TABS */
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#1f2333]">
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm">
-              <Briefcase className="size-4" />
-              <span>Team Members ({filteredTeam.length})</span>
-            </span>
-
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#161826]">
-              <span>Field Agents & Dealership Staff</span>
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setAddTeamModalOpen(true)}
-            className="btn-primary !py-2 !px-3.5 text-xs font-bold"
-          >
-            <UserPlus className="size-4" />
-            <span>+ Add Staff Member</span>
-          </button>
-        </div>
-      )}
-
-      {/* 4. TAB 1: VEHICLE USERS HUB */}
+        <>
+       
+      {/* 4. TAB 1: USER MANAGEMENT (ALL USERS & ALL VEHICLES) */}
       {activeTab === 'users' && (
         <div className="space-y-4">
-          {/* Search & Filter Header Bar */}
-          <div className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex flex-1 items-center gap-2">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Search user by name, mobile, vehicle plate..."
-                  className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-10 pr-4 py-2 text-xs text-ink dark:text-white placeholder-slate-400 focus:border-brand-500 focus:outline-none"
-                />
+          {/* Sub-tabs: All Users vs All Vehicles */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#181b28] border border-slate-200/80 dark:border-[#222538]">
+              <button
+                type="button"
+                onClick={() => setUserSubTab('users')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  userSubTab === 'users'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Users className="size-3.5" />
+                <span>All Users List ({filteredUsers.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUserSubTab('vehicles')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  userSubTab === 'vehicles'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Car className="size-3.5" />
+                {/* <span>All Vehicles List ({filteredVehicles.length})</span> */}
+              </button>
+            </div>
+
+            {/* Quick status count pills */}
+            <div className="flex items-center gap-2">
+              {userSubTab === 'users' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      statusFilter === 'ALL'
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'bg-slate-100 dark:bg-[#181b28] text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                    }`}
+                  >
+                    All Users ({displayUsers.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('ACTIVE')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      statusFilter === 'ACTIVE'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
+                    }`}
+                  >
+                    Active Users ({activeUserCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('BLOCKED')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      statusFilter === 'BLOCKED'
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100'
+                    }`}
+                  >
+                    Blocked Users ({blockedUserCount})
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setVehicleStatusFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      vehicleStatusFilter === 'ALL'
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'bg-slate-100 dark:bg-[#181b28] text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                    }`}
+                  >
+                    All Vehicles ({allVehicles.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVehicleStatusFilter('ACTIVE')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      vehicleStatusFilter === 'ACTIVE'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
+                    }`}
+                  >
+                    Active Vehicles ({activeVehiclesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVehicleStatusFilter('BLOCKED')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                      vehicleStatusFilter === 'BLOCKED'
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100'
+                    }`}
+                  >
+                    Blocked Vehicles ({blockedVehiclesCount})
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* VIEW A: ALL USERS TABLE */}
+          {userSubTab === 'users' && (
+            <>
+              {/* Search & Filter Header Bar */}
+              <div className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-1 items-center gap-2">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="Search user by name, mobile, vehicle plate..."
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-10 pr-4 py-2 text-xs text-ink dark:text-white placeholder-slate-400 focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
+                  >
+                    <option value="ALL">All Status</option>
+                    <option value="ACTIVE">Active Users</option>
+                    <option value="BLOCKED">Blocked Users</option>
+                  </select>
+
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
+                  >
+                    <option value="ALL">All Roles</option>
+                    <option value="user">User (Owner)</option>
+                    <option value="sales">Sales Staff</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
               </div>
 
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
-              >
-                <option value="ALL">All Status</option>
-                <option value="ACTIVE">Active Users</option>
-                <option value="BLOCKED">Blocked Users</option>
-              </select>
+              {/* User List Table */}
+              <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
+                      <tr>
+                        <th className="py-3.5 px-5">User / Owner</th>
+                        <th className="py-3.5 px-5">Mobile & Contact</th>
+                        <th className="py-3.5 px-5">Role</th>
+                        <th className="py-3.5 px-5">Primary Vehicle & Sticker</th>
+                        <th className="py-3.5 px-5">Blood Group</th>
+                        <th className="py-3.5 px-5">Status</th>
+                        <th className="py-3.5 px-5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
+                      {filteredUsers.length > 0 ? (
+                        filteredUsers.map((u) => {
+                          const isBlocked = u.status === 'BLOCKED' || u.isActive === false;
+                          const vehiclePlate = u.primaryVehicle?.vehicleNumber || u.vehicles?.[0]?.vehicleNumber;
 
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
-              >
-                <option value="ALL">All Roles</option>
-                <option value="user">User (Owner)</option>
-                <option value="sales">Sales Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          </div>
+                          return (
+                            <tr key={u._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
+                              <td className="py-3.5 px-5">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={u.profilePic || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
+                                    alt={u.name}
+                                    className="size-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                                  />
+                                  <div>
+                                    <span className="font-bold text-sm text-ink block">{u.name || 'Unnamed User'}</span>
+                                    <span className="text-[11px] text-slate-400 block">{u.email || 'No email registered'}</span>
+                                  </div>
+                                </div>
+                              </td>
 
-          {/* User List Table */}
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
-                  <tr>
-                    <th className="py-3.5 px-5">User / Owner</th>
-                    <th className="py-3.5 px-5">Mobile & Contact</th>
-                    <th className="py-3.5 px-5">Role</th>
-                    <th className="py-3.5 px-5">Primary Vehicle & Sticker</th>
-                    <th className="py-3.5 px-5">Blood Group</th>
-                    <th className="py-3.5 px-5">Status</th>
-                    <th className="py-3.5 px-5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((u) => {
-                      const isBlocked = u.status === 'BLOCKED' || u.isActive === false;
-                      const vehiclePlate = u.primaryVehicle?.vehicleNumber || u.vehicles?.[0]?.vehicleNumber;
+                              <td className="py-3.5 px-5 font-mono text-xs">
+                                <span className="font-semibold text-ink">+91 {u.phone}</span>
+                              </td>
 
-                      return (
-                        <tr key={u._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
-                          {/* User Name & Avatar */}
-                          <td className="py-3.5 px-5">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={u.profilePic || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
-                                alt={u.name}
-                                className="size-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
-                              />
-                              <div>
-                                <span className="font-bold text-sm text-ink block">{u.name || 'Unnamed User'}</span>
-                                <span className="text-[11px] text-slate-400 block">{u.email || 'No email registered'}</span>
-                              </div>
-                            </div>
-                          </td>
+                              <td className="py-3.5 px-5">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${u.role === 'admin'
+                                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
+                                      : u.role === 'sales'
+                                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/60'
+                                        : 'bg-slate-100 dark:bg-[#1a1d2e] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#262a3e]'
+                                    }`}
+                                >
+                                  {u.role || 'user'}
+                                </span>
+                              </td>
 
-                          {/* Mobile */}
-                          <td className="py-3.5 px-5 font-mono text-xs">
-                            <span className="font-semibold text-ink">+91 {u.phone}</span>
-                          </td>
-
-                          {/* Role */}
-                          <td className="py-3.5 px-5">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${u.role === 'admin'
-                                  ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
-                                  : u.role === 'sales'
-                                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/60'
-                                    : 'bg-slate-100 dark:bg-[#1a1d2e] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#262a3e]'
-                                }`}
-                            >
-                              {u.role || 'user'}
-                            </span>
-                          </td>
-
-                          {/* Primary Vehicle & Sticker */}
-                          <td className="py-3.5 px-5">
-                            {vehiclePlate ? (
-                              <div className="flex items-center gap-2">
-                                <PlateBadge value={vehiclePlate} size="sm" />
-                                {u.primaryVehicle?.vehicleModel && (
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                                    {u.primaryVehicle.vehicleModel}
-                                  </span>
+                              <td className="py-3.5 px-5">
+                                {vehiclePlate ? (
+                                  <div className="flex items-center gap-2">
+                                    <PlateBadge value={vehiclePlate} size="sm" />
+                                    {u.primaryVehicle?.vehicleModel && (
+                                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                        {u.primaryVehicle.vehicleModel}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs italic">No vehicle linked</span>
                                 )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs italic">No vehicle linked</span>
-                            )}
-                          </td>
+                              </td>
 
-                          {/* Blood Group */}
-                          <td className="py-3.5 px-5 font-bold text-rose-600 dark:text-rose-400">
-                            {u.bloodGroup || 'B+'}
-                          </td>
+                              <td className="py-3.5 px-5 font-bold text-rose-600 dark:text-rose-400">
+                                {u.bloodGroup || 'B+'}
+                              </td>
 
-                          {/* Status */}
-                          <td className="py-3.5 px-5">
-                            <StatusBadge status={isBlocked ? 'INACTIVE' : 'ACTIVE'} label={isBlocked ? 'Blocked' : 'Active'} />
-                          </td>
+                              <td className="py-3.5 px-5">
+                                <StatusBadge status={isBlocked ? 'INACTIVE' : 'ACTIVE'} label={isBlocked ? 'Blocked' : 'Active'} />
+                              </td>
 
-                          {/* Actions: Eye, Edit, Block */}
-                          <td className="py-3.5 px-5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {/* Eye Button: View Details Dossier */}
-                              <button
-                                onClick={() => handleViewUser(u)}
-                                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] transition"
-                                title="View User Complete Details Dossier"
-                              >
-                                <Eye className="size-4" />
-                              </button>
+                              <td className="py-3.5 px-5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => handleViewUser(u)}
+                                    className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] transition"
+                                    title="View User Complete Details Dossier"
+                                  >
+                                    <Eye className="size-4" />
+                                  </button>
 
-                              {/* Edit Button: Update User */}
-                              <button
-                                onClick={() => handleOpenEditUser(u)}
-                                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] transition"
-                                title="Update User Profile & Role"
-                              >
-                                <Edit className="size-4" />
-                              </button>
+                                  <button
+                                    onClick={() => handleOpenEditUser(u)}
+                                    className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] transition"
+                                    title="Update User Profile & Role"
+                                  >
+                                    <Edit className="size-4" />
+                                  </button>
 
-                              {/* Block / Unblock Button */}
-                              <button
-                                onClick={() => handleToggleUserBlock(u._id, u.status)}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${isBlocked
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 hover:bg-emerald-100'
-                                    : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 hover:bg-rose-100'
-                                  }`}
-                                title={isBlocked ? 'Activate User' : 'Block User from System'}
-                              >
-                                {isBlocked ? 'Unblock' : 'Block'}
-                              </button>
-                            </div>
+                                  <button
+                                    onClick={() => handleToggleUserBlock(u._id, u.status)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${isBlocked
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 hover:bg-emerald-100'
+                                        : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 hover:bg-rose-100'
+                                      }`}
+                                    title={isBlocked ? 'Activate User' : 'Block User from System'}
+                                  >
+                                    {isBlocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-slate-500 text-xs">
+                            No vehicle users match the search filter.
                           </td>
                         </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan="7" className="p-8 text-center text-slate-500 text-xs">
-                        No vehicle users match the search filter.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* VIEW B: ALL VEHICLES TABLE */}
+          {userSubTab === 'vehicles' && (
+            <>
+              {/* Vehicles Search & Filter Bar */}
+              <div className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-1 items-center gap-2">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={vehicleSearch}
+                      onChange={(e) => setVehicleSearch(e.target.value)}
+                      placeholder="Search vehicle plate number, model, owner name..."
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-10 pr-4 py-2 text-xs text-ink dark:text-white placeholder-slate-400 focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <select
+                    value={vehicleStatusFilter}
+                    onChange={(e) => setVehicleStatusFilter(e.target.value)}
+                    className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
+                  >
+                    <option value="ALL">All Vehicles ({allVehicles.length})</option>
+                    <option value="ACTIVE">Active Vehicles ({activeVehiclesCount})</option>
+                    <option value="BLOCKED">Blocked Vehicles ({blockedVehiclesCount})</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Vehicles List Table */}
+              <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
+                      <tr>
+                        <th className="py-3.5 px-5">Plate Number</th>
+                        <th className="py-3.5 px-5">Model & Vehicle Type</th>
+                        <th className="py-3.5 px-5">Owner / Contact</th>
+                        <th className="py-3.5 px-5">Linked QR Tag</th>
+                        <th className="py-3.5 px-5">Vehicle Status</th>
+                        <th className="py-3.5 px-5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
+                      {filteredVehicles.length > 0 ? (
+                        filteredVehicles.map((v) => {
+                          const isBlocked = !v.isActive || v.status === 'BLOCKED';
+
+                          return (
+                            <tr key={v._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
+                              {/* Plate Badge */}
+                              <td className="py-3.5 px-5 font-bold">
+                                <PlateBadge value={v.vehicleNumber} size="md" />
+                              </td>
+
+                              {/* Model & Type */}
+                              <td className="py-3.5 px-5">
+                                <span className="font-bold text-ink block">{v.vehicleModel}</span>
+                                <span className="text-[11px] text-slate-400 block">{v.vehicleType}</span>
+                              </td>
+
+                              {/* Owner */}
+                              <td className="py-3.5 px-5">
+                                <span className="font-bold text-ink block">{v.ownerName}</span>
+                                <span className="text-[11px] text-slate-400 font-mono block">+91 {v.ownerPhone}</span>
+                              </td>
+
+                              {/* QR Tag */}
+                              <td className="py-3.5 px-5">
+                                {v.tagCode ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-mono text-xs font-bold">
+                                    <QrCode className="size-3.5" />
+                                    <span>{v.tagCode}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-xs italic">No tag linked</span>
+                                )}
+                              </td>
+
+                              {/* Status */}
+                              <td className="py-3.5 px-5">
+                                <StatusBadge status={isBlocked ? 'INACTIVE' : 'ACTIVE'} label={isBlocked ? 'Blocked' : 'Active'} />
+                              </td>
+
+                              {/* Actions */}
+                              <td className="py-3.5 px-5 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Eye button to view owner dossier */}
+                                  {v.ownerUser && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewUser(v.ownerUser)}
+                                      className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] transition"
+                                      title="View Owner Complete Dossier"
+                                    >
+                                      <Eye className="size-4" />
+                                    </button>
+                                  )}
+
+                                  {/* Block / Unblock Vehicle toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleVehicleBlock(v)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${isBlocked
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 hover:bg-emerald-100'
+                                        : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 hover:bg-rose-100'
+                                      }`}
+                                    title={isBlocked ? 'Unblock this vehicle' : 'Block this vehicle'}
+                                  >
+                                    {isBlocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan="6" className="p-8 text-center text-slate-500 text-xs">
+                            No vehicles match the selected search or filter.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* 5. TAB 2: SALES & STAFF TEAM PORTAL */}
       {activeTab === 'team' && (
         <div className="space-y-4">
+          {/* Team Quick Filter Pills & Add Action Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTeamStatusFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  teamStatusFilter === 'ALL'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-[#181b28] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#202436]'
+                }`}
+              >
+                All Staff ({totalStaffCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTeamStatusFilter('ACTIVE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  teamStatusFilter === 'ACTIVE'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
+                }`}
+              >
+                Active Staff ({activeStaffCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTeamStatusFilter('BLOCKED')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  teamStatusFilter === 'BLOCKED'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100'
+                }`}
+              >
+                Deactive / Blocked ({blockedStaffCount})
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAddTeamModalOpen(true)}
+              className="btn-primary !py-2 !px-4 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+            >
+              <UserPlus className="size-3.5" />
+              <span>+ Add Staff Member</span>
+            </button>
+          </div>
+
           {/* Filter & Action Bar */}
           <div className="card p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2.5 flex-1">
@@ -1727,7 +1795,11 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="py-3.5 px-4">Staff Member Details</th>
                     <th className="py-3.5 px-4">Role</th>
-                    <th className="py-3.5 px-4">Mobile Number</th>
+                    <th className="py-3.5 px-4">Mobile & Contact</th>
+                    <th className="py-3.5 px-4 text-center">Scanners Sold</th>
+                    <th className="py-3.5 px-4 text-right">Base Salary</th>
+                    <th className="py-3.5 px-4 text-right">Incentive / QR</th>
+                    <th className="py-3.5 px-4 text-right">Total Net Payout</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
@@ -1764,15 +1836,43 @@ export default function AdminDashboard() {
                           </span>
                         </td>
 
+                        {/* Total Scanners Sold */}
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-extrabold text-xs border border-blue-200 dark:border-blue-800">
+                            <QrCode className="size-3.5" />
+                            <span>{m.totalSalesCount || 0}</span>
+                          </span>
+                        </td>
+
+                        {/* Base Salary */}
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
+                          ₹{(m.baseSalary !== undefined ? m.baseSalary : 15000).toLocaleString('en-IN')}
+                        </td>
+
+                        {/* Incentive per QR */}
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">
+                          <span className="font-extrabold text-purple-600 dark:text-purple-400">
+                            ₹{m.incentivePerScanner || m.salaryOrCommissionRate || 100}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block font-normal">per QR</span>
+                        </td>
+
+                        {/* Total Net Payout = Base + (Sales * Incentive) */}
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">
+                          <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                            ₹{((m.baseSalary !== undefined ? m.baseSalary : 15000) + ((m.totalSalesCount || 0) * (m.incentivePerScanner || m.salaryOrCommissionRate || 100))).toLocaleString('en-IN')}
+                          </span>
+                        </td>
+
                         {/* Status (Active / Blocked & Salary Status) */}
                         <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <StatusBadge status={m.status || 'ACTIVE'} />
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isPaid
                                 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                                 : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
                               }`}>
-                              Salary: {isPaid ? 'PAID' : 'PENDING'}
+                              {isPaid ? 'PAID' : 'PENDING'}
                             </span>
                           </div>
                         </td>
@@ -1826,7 +1926,7 @@ export default function AdminDashboard() {
                   })}
                   {filteredTeam.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="p-8 text-center text-slate-500 text-xs">
+                      <td colSpan="9" className="p-8 text-center text-slate-500 text-xs">
                         No team members found matching your filter criteria.
                       </td>
                     </tr>
@@ -1838,10 +1938,48 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* 6. TAB 3: QR STICKERS INVENTORY */}
+      {/* 6. TAB 3: MASTER MANAGEMENT (QR GENERATE & SALARY INCENTIVES) */}
       {activeTab === 'scanners' && (
         <div className="space-y-6">
-          {/* Pre-Printed Sticker Batch Generator Card */}
+          {/* Sub-tabs: QR Stickers Stock vs Employee Salary & Incentives per QR */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#181b28] border border-slate-200/80 dark:border-[#222538]">
+              <button
+                type="button"
+                onClick={() => setMasterSubTab('qr')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  masterSubTab === 'qr'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <QrCode className="size-3.5" />
+                <span>QR Generate & Sticker Stock ({scanners.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMasterSubTab('incentives')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  masterSubTab === 'incentives'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Banknote className="size-3.5" />
+                <span>Employee Salary & Incentives (Per QR)</span>
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold px-2">
+              {masterSubTab === 'qr' ? 'Physical QR Inventory & Print' : 'Configure Incentive per Activated QR'}
+            </div>
+          </div>
+
+          {/* VIEW A: QR GENERATE & STICKER STOCK INVENTORY */}
+          {masterSubTab === 'qr' && (
+            <div className="space-y-6">
+              {/* Pre-Printed Sticker Batch Generator Card */}
           <div className="card p-6 bg-gradient-to-br from-brand-50/70 via-white to-white dark:from-brand-950/40 dark:via-[#12141e] dark:to-[#12141e] border-brand-200/80 dark:border-brand-900/60">
             <div className="flex items-center gap-2.5 text-brand-800 dark:text-brand-300 mb-2">
               <QrCode className="size-5 text-brand-600 dark:text-brand-400" />
@@ -2041,6 +2179,259 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
+            </div>
+          )}
+
+          {/* VIEW B: EMPLOYEE SALARY & INCENTIVE (PER QR) RULES */}
+          {masterSubTab === 'incentives' && (
+            <div className="space-y-6">
+              {/* Card 1: Configuration Form for Particular Employee */}
+              <div className="card p-6 bg-gradient-to-br from-purple-50/70 via-white to-white dark:from-purple-950/30 dark:via-[#121420] dark:to-[#121420] border-purple-200/80 dark:border-purple-900/60">
+                <div className="flex items-center gap-2.5 text-purple-800 dark:text-purple-300 mb-2">
+                  <div className="size-8 rounded-xl bg-purple-600 text-white grid place-items-center shadow-sm">
+                    <IndianRupee className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-ink">Set Salary & Incentive per QR for Particular Employee</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Configure individual staff base salary and custom incentive rate earned per vehicle sticker activated.
+                    </p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!selectedStaffForRule) {
+                      alert('Please select an employee first');
+                      return;
+                    }
+                    const targetStaff = displayTeam.find(m => m._id === selectedStaffForRule);
+                    if (!targetStaff) return;
+                    try {
+                      const res = await adminApiFetch(`/api/admin/team/${targetStaff._id}/salary-incentive`, {
+                        method: 'PUT',
+                        body: JSON.stringify(customIncentiveForm)
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        alert(`Salary & Incentive rule successfully applied for ${targetStaff.name}!`);
+                        loadAllData();
+                      } else {
+                        alert(data.message || 'Failed to update rule');
+                      }
+                    } catch (err) {
+                      alert('Error: ' + err.message);
+                    }
+                  }}
+                  className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
+                  {/* Employee Dropdown */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Select Employee / Staff Member
+                    </label>
+                    <select
+                      value={selectedStaffForRule}
+                      onChange={(e) => {
+                        const mId = e.target.value;
+                        setSelectedStaffForRule(mId);
+                        const member = displayTeam.find(m => m._id === mId);
+                        if (member) {
+                          setCustomIncentiveForm({
+                            baseSalary: member.baseSalary !== undefined && member.baseSalary !== null ? member.baseSalary : 15000,
+                            incentivePerScanner: member.incentivePerScanner || member.salaryOrCommissionRate || 100,
+                            monthlyTarget: member.monthlyTarget || 50
+                          });
+                        }
+                      }}
+                      required
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3.5 py-2 text-xs font-semibold text-ink dark:text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="">-- Choose Employee --</option>
+                      {displayTeam.map(m => (
+                        <option key={m._id} value={m._id}>
+                          {m.name} ({m.role || 'Sales Staff'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Base Fixed Monthly Salary */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Base Monthly Salary (फिक्स वेतन - ₹)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">₹</span>
+                      <input
+                        type="number"
+                        required
+                        value={customIncentiveForm.baseSalary}
+                        onChange={(e) => setCustomIncentiveForm({ ...customIncentiveForm, baseSalary: Number(e.target.value) })}
+                        placeholder="e.g. 15000"
+                        className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-8 pr-3 py-2 text-xs font-mono font-bold text-ink dark:text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Incentive Per QR (प्रति QR इंसेंटिव) */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Incentive Per QR (प्रति QR इंसेंटिव - ₹)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-emerald-500 text-xs">₹</span>
+                      <input
+                        type="number"
+                        required
+                        value={customIncentiveForm.incentivePerScanner}
+                        onChange={(e) => setCustomIncentiveForm({ ...customIncentiveForm, incentivePerScanner: Number(e.target.value) })}
+                        placeholder="e.g. 100"
+                        className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-8 pr-3 py-2 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Monthly Target Quota & Save */}
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Monthly Target (QRs)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={customIncentiveForm.monthlyTarget}
+                        onChange={(e) => setCustomIncentiveForm({ ...customIncentiveForm, monthlyTarget: Number(e.target.value) })}
+                        placeholder="e.g. 50"
+                        className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs font-mono font-bold text-ink dark:text-white focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn-primary !py-2 !px-4 text-xs font-bold whitespace-nowrap shadow-sm shadow-purple-500/20"
+                    >
+                      Save Rule
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Card 2: Matrix Table of Configured Rates for All Employees */}
+              <div className="card overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-[#1f2333] flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">Configured Salary & Incentive Matrix (Per QR)</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Current active rates and payout estimation per team member</p>
+                  </div>
+                  <span className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-900">
+                    {displayTeam.length} Active Staff Members
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
+                      <tr>
+                        <th className="py-3 px-4">Staff Member</th>
+                        <th className="py-3 px-4">Role</th>
+                        <th className="py-3 px-4">Mobile & Contact</th>
+                        <th className="py-3 px-4 text-right">Base Salary (₹)</th>
+                        <th className="py-3 px-4 text-right">Incentive / QR</th>
+                        <th className="py-3 px-4 text-center">Monthly Target</th>
+                        <th className="py-3 px-4 text-center">Scanners Sold</th>
+                        <th className="py-3 px-4 text-right">Net Monthly Payout</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
+                      {displayTeam.map(m => {
+                        const baseSal = m.baseSalary !== undefined && m.baseSalary !== null ? m.baseSalary : 15000;
+                        const incRate = m.incentivePerScanner || m.salaryOrCommissionRate || 100;
+                        const salesCount = m.totalSalesCount || 0;
+                        const totalPayout = baseSal + (salesCount * incRate);
+
+                        return (
+                          <tr key={m._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="size-8 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-extrabold grid place-items-center text-xs shrink-0 border border-purple-200 dark:border-purple-800">
+                                  {m.name?.slice(0, 2).toUpperCase() || 'ST'}
+                                </div>
+                                <div>
+                                  <span className="font-bold text-ink block">{m.name}</span>
+                                  <span className="text-[11px] text-slate-400 block">{m.email || 'Field Agent'}</span>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60">
+                                {m.role}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4 font-mono text-xs">
+                              +91 {m.phone}
+                            </td>
+
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                              ₹{baseSal.toLocaleString('en-IN')}
+                            </td>
+
+                            <td className="py-3 px-4 text-right font-mono">
+                              <span className="font-extrabold text-purple-600 dark:text-purple-400">₹{incRate}</span>
+                              <span className="text-[10px] text-slate-400 block">per QR</span>
+                            </td>
+
+                            <td className="py-3 px-4 text-center font-mono font-semibold">
+                              {m.monthlyTarget || 50} QRs
+                            </td>
+
+                            <td className="py-3 px-4 text-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-extrabold text-xs border border-blue-200 dark:border-blue-800">
+                                <QrCode className="size-3" />
+                                <span>{salesCount}</span>
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4 text-right font-mono">
+                              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
+                                ₹{totalPayout.toLocaleString('en-IN')}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenSalaryIncentive(m)}
+                                  className="px-2.5 py-1 rounded-lg text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 border border-purple-200 dark:border-purple-800 font-bold text-[11px] transition"
+                                  title="Quick Update Salary & Incentive"
+                                >
+                                  Configure
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewStaff(m)}
+                                  className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-[#1a1d2e] transition"
+                                  title="View Staff Working Dossier"
+                                >
+                                  <Eye className="size-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2151,6 +2542,8 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {/* ================= MODAL: VIEW USER DOSSIER (EYE BUTTON) ================= */}
@@ -3285,48 +3678,69 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Performance KPIs Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
+            {/* Performance KPIs Summary: Sales, Working Days, Incentive/QR, Base Salary, Net Total */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {/* 1. Scanners Sold (कुल बिक्री) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Total Users Onboarded
+                  Scanners Sold (कुल बिक्री)
                 </span>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl font-display font-extrabold text-brand-600 dark:text-cyan-400">
-                    {viewStaffModal.totalSales || viewStaffModal.onboardedUsers?.length || 0}
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-display font-extrabold text-blue-600 dark:text-blue-400">
+                    {viewStaffModal.totalSales || viewStaffModal.member?.totalSalesCount || 0}
                   </span>
-                  <span className="text-xs text-slate-500">vehicle owners</span>
+                  <span className="text-[11px] text-slate-500">stickers</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
+              {/* 2. Working Days (कार्य दिवस) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Commission Earned
+                  Working Days (कार्य दिवस)
                 </span>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-2xl font-display font-extrabold text-emerald-600 dark:text-emerald-400">
-                    ₹{(viewStaffModal.totalCommission || 0).toLocaleString('en-IN')}
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-display font-extrabold text-indigo-600 dark:text-indigo-400">
+                    {viewStaffModal.workReports?.length ? `${viewStaffModal.workReports.length}` : '26'}
                   </span>
-                  <span className="text-[10px] text-slate-400">(@ ₹{viewStaffModal.member?.salaryOrCommissionRate || 100}/user)</span>
+                  <span className="text-[11px] text-slate-500">days present</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    Target Progress
-                  </span>
-                  <span className="text-xs font-bold text-ink">{viewStaffModal.targetProgressPercent || 0}%</span>
-                </div>
-                <div className="mt-2 w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-brand-600 dark:bg-cyan-500 h-full rounded-full transition-all"
-                    style={{ width: `${viewStaffModal.targetProgressPercent || 0}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-slate-400 block mt-1">
-                  Target: {viewStaffModal.monthlyTarget || 50} stickers / month
+              {/* 3. Incentive per QR (प्रति QR इंसेंटिव) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Incentive / QR (इंसेंटिव)
                 </span>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-display font-extrabold text-purple-600 dark:text-purple-400">
+                    ₹{viewStaffModal.member?.incentivePerScanner || viewStaffModal.member?.salaryOrCommissionRate || 100}
+                  </span>
+                  <span className="text-[10px] text-slate-400">/ QR</span>
+                </div>
+              </div>
+
+              {/* 4. Base Monthly Salary (फिक्स वेतन) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                  Base Salary (फिक्स वेतन)
+                </span>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-display font-extrabold text-slate-800 dark:text-slate-100">
+                    ₹{(viewStaffModal.member?.baseSalary !== undefined && viewStaffModal.member?.baseSalary !== null ? viewStaffModal.member?.baseSalary : 15000).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              {/* 5. Total Net Payout (कुल शुद्ध भुगतान) */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider block">
+                  Total Net Payout (कुल देय)
+                </span>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-display font-extrabold text-emerald-600 dark:text-emerald-300">
+                    ₹{((viewStaffModal.member?.baseSalary !== undefined && viewStaffModal.member?.baseSalary !== null ? viewStaffModal.member?.baseSalary : 15000) + ((viewStaffModal.totalSales || viewStaffModal.member?.totalSalesCount || 0) * (viewStaffModal.member?.incentivePerScanner || viewStaffModal.member?.salaryOrCommissionRate || 100))).toLocaleString('en-IN')}
+                  </span>
+                </div>
               </div>
             </div>
 

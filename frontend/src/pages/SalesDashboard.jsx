@@ -52,8 +52,19 @@ import {
   Calculator,
   IndianRupee,
   LayoutDashboard,
-  Menu
+  Menu,
+  Ban
 } from 'lucide-react';
+
+// Helper to normalize date to YYYY-MM-DD string
+const toDateString = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 // Reusable SVG Donut Paychart Component
 function DonutPayChart({ items = [], size = 150, strokeWidth = 20, centerLabel = '', centerSub = '' }) {
@@ -122,6 +133,9 @@ export default function SalesDashboard() {
   // Reports sub-tab: 'weekly' | 'monthly' | 'yearly'
   const [reportPeriod, setReportPeriod] = useState('weekly');
 
+  // Customer Status Filter: 'ALL' | 'ACTIVE' | 'BLOCKED'
+  const [customerStatusFilter, setCustomerStatusFilter] = useState('ALL');
+
   // Authentication states if not signed in
   const [loginPhone, setLoginPhone] = useState('9821889900');
   const [loginPassword, setLoginPassword] = useState('password123');
@@ -159,7 +173,8 @@ export default function SalesDashboard() {
     vehicleNumber: '',
     vehicleModel: '',
     vehicleType: 'Car',
-    vehicleColor: 'White'
+    vehicleColor: 'White',
+    status: 'ACTIVE'
   });
 
   // Direct Customer Onboarding Form
@@ -294,7 +309,7 @@ export default function SalesDashboard() {
       const data = await res.json();
 
       if (data.success) {
-        setSuccessMsg(`🎉 Customer ${onboardForm.name} onboarded successfully with Sticker ${onboardForm.tagCode}! (+₹${data.data?.commissionEarned || 125} commission credited)`);
+        setSuccessMsg(`🎉 Customer ${onboardForm.name} onboarded successfully with Sticker ${onboardForm.tagCode}! (+₹${data.data?.commissionEarned || 100} commission credited)`);
         setOnboardForm({
           name: '',
           phone: '',
@@ -342,7 +357,8 @@ export default function SalesDashboard() {
       vehicleNumber: cust.vehicleNumber || '',
       vehicleModel: cust.vehicleModel || '',
       vehicleType: cust.vehicleType || 'Car',
-      vehicleColor: cust.vehicleColor || 'White'
+      vehicleColor: cust.vehicleColor || 'White',
+      status: cust.status || 'ACTIVE'
     });
   };
 
@@ -368,6 +384,30 @@ export default function SalesDashboard() {
       alert('Error: ' + err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Toggle Customer Block / Unblock by Sales Agent
+  const handleToggleCustomerBlock = async (id, currentStatus) => {
+    const isCurrentlyBlocked = currentStatus === 'BLOCKED' || currentStatus === 'INACTIVE';
+    const nextStatus = isCurrentlyBlocked ? 'ACTIVE' : 'BLOCKED';
+    try {
+      const res = await authFetch(`/api/sales/customer/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus, isActive: nextStatus === 'ACTIVE' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCustomers(customers.map(c => (c._id === id ? { ...c, status: nextStatus, isActive: nextStatus === 'ACTIVE' } : c)));
+        if (selectedCustomer && selectedCustomer._id === id) {
+          setSelectedCustomer({ ...selectedCustomer, status: nextStatus, isActive: nextStatus === 'ACTIVE' });
+        }
+      } else {
+        alert(data.message || 'Failed to update customer status');
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
     }
   };
 
@@ -442,10 +482,33 @@ export default function SalesDashboard() {
     }
   };
 
+  // Active and Blocked Customers Counts
+  const activeCustomersCount = customers.filter(c => c.status === 'ACTIVE' || c.isActive !== false).length;
+  const pendingCustomersCount = customers.filter(c => c.status === 'BLOCKED' || c.status === 'INACTIVE' || c.isActive === false).length;
+
   // Filtered customer list
   const filteredCustomers = customers.filter(c => {
-    if (vehicleFilter === 'ALL') return true;
-    return (c.vehicleType || '').toLowerCase() === vehicleFilter.toLowerCase();
+    // Status filter
+    if (customerStatusFilter === 'ACTIVE' && (c.status === 'BLOCKED' || c.status === 'INACTIVE' || c.isActive === false)) return false;
+    if (customerStatusFilter === 'BLOCKED' && c.status !== 'BLOCKED' && c.status !== 'INACTIVE' && c.isActive !== false) return false;
+    // Vehicle type filter
+    if (vehicleFilter !== 'ALL' && (c.vehicleType || '').toLowerCase() !== vehicleFilter.toLowerCase()) return false;
+    return true;
+  });
+
+  // Calendar dates helper for "My Work" tab
+  const currentDate = new Date();
+  const calYear = currentDate.getFullYear();
+  const calMonth = currentDate.getMonth(); // 0-indexed
+  const daysInCalMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstDayOfWeek = new Date(calYear, calMonth, 1).getDay(); // 0 = Sun
+  const monthNameEn = currentDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // Map of date string -> attendance record
+  const attendanceMap = {};
+  (attendanceData?.records || []).forEach(r => {
+    const dStr = toDateString(r.date);
+    attendanceMap[dStr] = r;
   });
 
   // If user is not authenticated, render dedicated Staff Login Screen
@@ -571,7 +634,7 @@ export default function SalesDashboard() {
   const agentPhone = user?.phone || stats?.agent?.phone || '9821889900';
   const agentDept = stats?.agent?.department || user?.department || 'Field Operations & Dealerships';
   const monthlyTarget = stats?.agent?.monthlyTarget || user?.monthlyTarget || 60;
-  const commissionRate = stats?.metrics?.commissionPerUnit || user?.salaryOrCommissionRate || 125;
+  const commissionRate = stats?.metrics?.commissionPerUnit || user?.salaryOrCommissionRate || 100;
   const bankDetails = stats?.agent?.bankDetails || user?.bankDetails || {};
 
   const metrics = stats?.metrics || {
@@ -584,8 +647,14 @@ export default function SalesDashboard() {
     yearSales: 15,
     targetAchievedPercent: Math.min(100, Math.round(((12) / monthlyTarget) * 100)),
     totalCommissionEarned: (customers.length || 15) * commissionRate,
-    commissionPerUnit: commissionRate
+    commissionPerUnit: commissionRate,
+    baseSalary: 15000,
+    incentivePerScanner: commissionRate
   };
+
+  const baseSalaryVal = stats?.payroll?.baseSalary || stats?.metrics?.baseSalary || 15000;
+  const incentivePerScannerVal = stats?.payroll?.incentivePerScanner || stats?.metrics?.incentivePerScanner || commissionRate;
+  const netPayableSalary = baseSalaryVal + (metrics.monthSales * incentivePerScannerVal);
 
   const attendanceSummary = stats?.attendanceSummary || {
     todayStatus: 'PRESENT',
@@ -601,21 +670,23 @@ export default function SalesDashboard() {
       icon: LayoutDashboard,
       badge: 'Live',
       badgeColor: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
-      desc: "Today's metrics & duty"
+      desc: "Today's metrics & status"
     },
     {
       tab: 'customers',
       label: 'My Onboarded Users',
       icon: Users,
       badge: `${customers.length}`,
-      badgeColor: 'bg-brand-500/20 text-brand-600 dark:text-brand-400',
-      desc: 'List, dossier, edit & delete'
+      badgeColor: 'bg-purple-500/20 text-purple-600 dark:text-purple-400',
+      desc: 'Users list, edit, eye & block'
     },
     {
       tab: 'attendance',
-      label: 'My Work & Duty',
+      label: 'My Work & Performance',
       icon: Briefcase,
-      desc: 'काम, कुल बिक्री व छुट्टी'
+      badge: `${attendanceSummary.daysWorkedMonth}d`,
+      badgeColor: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+      desc: 'काम, कैलेंडर, छुट्टी व वेतन'
     },
     {
       tab: 'reports',
@@ -651,7 +722,7 @@ export default function SalesDashboard() {
         {/* Brand Header */}
         <div className="flex h-16 items-center justify-between px-5 border-b border-slate-100 dark:border-[#1a1d2c] shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-tr from-brand-700 to-brand-500 text-white shadow-md shadow-brand-500/20">
+            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-tr from-purple-700 to-indigo-600 text-white shadow-md shadow-purple-600/20">
               <Shield className="size-5.5" />
             </div>
             <div>
@@ -677,9 +748,9 @@ export default function SalesDashboard() {
         </div>
 
         {/* Agent Profile & Duty Summary Card */}
-        <div className="p-3.5 mx-3 my-3 rounded-2xl bg-gradient-to-br from-brand-50/60 to-blue-50/40 dark:from-[#151722] dark:to-[#1a1c29] border border-brand-100 dark:border-[#222638] shrink-0">
+        <div className="p-3.5 mx-3 my-3 rounded-2xl bg-gradient-to-br from-purple-50/60 to-indigo-50/40 dark:from-[#151722] dark:to-[#1a1c29] border border-purple-100 dark:border-[#222638] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-brand-600 text-white font-bold grid place-items-center text-sm shadow-sm shrink-0">
+            <div className="size-10 rounded-xl bg-purple-600 text-white font-bold grid place-items-center text-sm shadow-sm shrink-0">
               {agentName.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
@@ -694,9 +765,9 @@ export default function SalesDashboard() {
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                 +91 {agentPhone}
               </p>
-              <div className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-brand-700 dark:text-cyan-400">
+              <div className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-purple-700 dark:text-purple-400">
                 <Target className="size-3 shrink-0" />
-                <span className="truncate">Monthly: {metrics.monthSales || 12}/{monthlyTarget} units</span>
+                <span className="truncate">Monthly: {metrics.monthSales || 12}/{monthlyTarget} QRs</span>
               </div>
             </div>
           </div>
@@ -717,13 +788,13 @@ export default function SalesDashboard() {
                 }}
                 className={`w-full group flex items-start gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition ${
                   isActive
-                    ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20 font-bold'
+                    ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/20 font-bold'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#151722]'
                 }`}
               >
                 <Icon
                   className={`size-4.5 mt-0.5 shrink-0 ${
-                    isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-brand-500'
+                    isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-purple-500'
                   }`}
                 />
                 <div className="min-w-0 flex-1">
@@ -799,7 +870,7 @@ export default function SalesDashboard() {
           </div>
 
           <div className="text-[10px] text-center text-slate-400 font-mono">
-            GadiRaksha Sales v2.4
+            GadiRaksha Sales Portal v2.5
           </div>
         </div>
       </aside>
@@ -819,15 +890,15 @@ export default function SalesDashboard() {
             </button>
             <div className="flex items-center gap-2">
               <span className="font-display font-bold text-sm sm:text-base text-ink dark:text-white">
-                {activeTab === 'overview' && "Dashboard Overview & Today's Duty"}
-                {activeTab === 'customers' && `My Onboarded Customers (${customers.length})`}
-                {activeTab === 'attendance' && "My Work & Duty (काम व छुट्टी)"}
+                {activeTab === 'overview' && "Sales Dashboard & Live Duty"}
+                {activeTab === 'customers' && `My Onboarded Users (${customers.length})`}
+                {activeTab === 'attendance' && "My Work & Performance (माई वर्क - कार्य, कैलेंडर व वेतन)"}
                 {activeTab === 'reports' && "Sales Velocity Reports"}
                 {activeTab === 'payout' && "Salary & Bank Details"}
               </span>
               <span className="hidden sm:inline-block size-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               <span className="hidden sm:inline-block text-xs text-slate-500 dark:text-slate-400">
-                Field Agent Console
+                Field Sales Console
               </span>
             </div>
           </div>
@@ -837,10 +908,10 @@ export default function SalesDashboard() {
             <button
               type="button"
               onClick={() => setShowAddCustomerModal(true)}
-              className="btn-primary !py-1.5 !px-3 text-xs font-bold shadow-md shadow-brand-500/20 inline-flex items-center gap-1.5"
+              className="btn-primary !py-1.5 !px-3 text-xs font-bold shadow-md shadow-purple-500/20 inline-flex items-center gap-1.5"
             >
               <Plus className="size-3.5" />
-              <span className="hidden md:inline">+ Onboard Customer</span>
+              <span className="hidden md:inline">+ Onboard User</span>
               <span className="md:hidden">+ User</span>
             </button>
 
@@ -864,7 +935,7 @@ export default function SalesDashboard() {
             </button>
 
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-[#1f2333]">
-              <div className="size-8 rounded-full bg-brand-600 text-white font-bold grid place-items-center text-xs">
+              <div className="size-8 rounded-full bg-purple-600 text-white font-bold grid place-items-center text-xs">
                 {agentName.slice(0, 2).toUpperCase()}
               </div>
               <div className="text-left hidden md:block">
@@ -872,7 +943,7 @@ export default function SalesDashboard() {
                   {agentName}
                 </span>
                 <span className="text-[10px] text-slate-400 leading-tight">
-                  Field Agent
+                  Field Sales Staff
                 </span>
               </div>
             </div>
@@ -884,18 +955,18 @@ export default function SalesDashboard() {
         
         {/* 
           ======================================================================
-          TAB 1: OVERVIEW & TODAY'S PERFORMANCE
+          TAB 1: OVERVIEW & PERFORMANCE DASHBOARD
           ======================================================================
         */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             
             {/* Salesman Performance Hero Banner */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-900 via-brand-800 to-brand-950 p-6 sm:p-8 text-white shadow-xl">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-950 p-6 sm:p-8 text-white shadow-xl border border-purple-800/40">
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-2.5 max-w-2xl">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 px-3 py-1 rounded-full text-xs font-semibold text-brand-200">
+                    <span className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 px-3 py-1 rounded-full text-xs font-semibold text-purple-200">
                       <Sparkles className="size-3.5 text-amber-300" />
                       <span>Sales Officer Dashboard</span>
                     </span>
@@ -922,11 +993,11 @@ export default function SalesDashboard() {
                   <h1 className="text-2xl sm:text-3xl font-display font-extrabold text-white">
                     नमस्ते, {agentName}
                   </h1>
-                  <p className="text-xs sm:text-sm text-brand-100/90 leading-relaxed">
-                    Track your today's active customer onboardings, scanner sales, duty days vs chutti, and multi-period performance.
+                  <p className="text-xs sm:text-sm text-purple-100/90 leading-relaxed">
+                    Track your total onboarded users, scanner QR sales, active vs pending customers, duty days, and net salary.
                   </p>
 
-                  <div className="pt-1 flex flex-wrap items-center gap-3 text-xs text-brand-200">
+                  <div className="pt-1 flex flex-wrap items-center gap-3 text-xs text-purple-200">
                     <span>Department: <strong className="text-white">{agentDept}</strong></span>
                     <span>•</span>
                     <span>Mobile: <strong className="text-white font-mono">+91 {agentPhone}</strong></span>
@@ -940,7 +1011,7 @@ export default function SalesDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowAddCustomerModal(true)}
-                    className="btn-primary !bg-white !text-brand-900 hover:!bg-brand-50 !py-2.5 !px-4 text-xs font-bold shadow-lg"
+                    className="btn-primary !bg-white !text-purple-900 hover:!bg-purple-50 !py-2.5 !px-4 text-xs font-bold shadow-lg"
                   >
                     + नया ग्राहक ऑनबोर्ड करें
                   </button>
@@ -955,8 +1026,8 @@ export default function SalesDashboard() {
                 </div>
               </div>
 
-              <div className="absolute right-0 top-0 size-80 rounded-full bg-white/5 blur-3xl pointer-events-none" />
-              <div className="absolute -right-20 -bottom-20 size-80 rounded-full bg-brand-400/10 blur-3xl pointer-events-none" />
+              <div className="absolute right-0 top-0 size-80 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+              <div className="absolute -right-20 -bottom-20 size-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
             </div>
 
             {/* 
@@ -964,7 +1035,7 @@ export default function SalesDashboard() {
               HIGHLIGHT CARD: AAJ KITNE USER ACTIVE KIYE (Today's Active Count)
               ==================================================================
             */}
-            <div className="rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-emerald-500/10 via-brand-500/10 to-blue-500/10 dark:from-emerald-950/40 dark:via-brand-950/40 dark:to-blue-950/40 border border-emerald-500/30 dark:border-emerald-500/20 shadow-md">
+            <div className="rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-emerald-500/10 via-purple-500/10 to-indigo-500/10 dark:from-emerald-950/40 dark:via-purple-950/40 dark:to-indigo-950/40 border border-emerald-500/30 dark:border-emerald-500/20 shadow-md">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="size-12 rounded-2xl bg-emerald-500 text-white grid place-items-center shadow-md shadow-emerald-500/30">
@@ -1000,7 +1071,7 @@ export default function SalesDashboard() {
                   <button
                     type="button"
                     onClick={() => setActiveTab('customers')}
-                    className="ml-auto text-xs font-bold text-brand-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
+                    className="ml-auto text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
                   >
                     <span>सूची देखें</span>
                     <ChevronRight className="size-4" />
@@ -1009,16 +1080,20 @@ export default function SalesDashboard() {
               </div>
             </div>
 
-            {/* 4 Core KPI Cards */}
+            {/* 
+              ==================================================================
+              4 CORE KPI CARDS (Kitne user add kiye, QR sale kiye, active, pending)
+              ==================================================================
+            */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
               
-              {/* Card 1: Total Customers */}
+              {/* Card 1: Kitne User Add Kiye Hai (Total Customers) */}
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    कुल ग्राहक (Total Users)
+                    कुल जोड़े गए यूजर (Users Added)
                   </span>
-                  <div className="p-2.5 rounded-xl bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-800">
+                  <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
                     <Users className="size-4.5" />
                   </div>
                 </div>
@@ -1036,11 +1111,11 @@ export default function SalesDashboard() {
                 </p>
               </div>
 
-              {/* Card 2: Stickers Sold This Month */}
+              {/* Card 2: Kitne QR Sale Kiye (Total Tags Sold) */}
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    इस महीने स्टिकर (This Month)
+                    कुल QR सेल किए (Tags Sold)
                   </span>
                   <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                     <QrCode className="size-4.5" />
@@ -1048,68 +1123,67 @@ export default function SalesDashboard() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-display font-black text-ink">
-                    {metrics.monthSales}
+                    {metrics.totalTagsSold}
                   </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">stickers bound</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">stickers activated</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                  <strong className="text-slate-700 dark:text-slate-200">{metrics.weekSales}</strong> this week
+                  <strong className="text-slate-700 dark:text-slate-200">{metrics.monthSales}</strong> this month ({metrics.weekSales} this week)
                 </p>
               </div>
 
-              {/* Card 3: Monthly Target Progress */}
+              {/* Card 3: Active Kitne Kiye (Active Users / QRs) */}
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    मासिक लक्ष्य (Monthly Goal)
+                    सक्रिय QR / उपभोक्ता (Active)
                   </span>
-                  <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                    <Target className="size-4.5" />
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle className="size-4.5" />
                   </div>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-display font-black text-brand-600 dark:text-cyan-400">
-                    {metrics.targetAchievedPercent}%
+                  <span className="text-3xl font-display font-black text-emerald-600 dark:text-emerald-400">
+                    {activeCustomersCount}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">of {monthlyTarget} goal</span>
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">active & running</span>
                 </div>
-                <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-3">
-                  <div
-                    className="h-full bg-brand-600 dark:bg-cyan-500 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, metrics.targetAchievedPercent)}%` }}
-                  />
-                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  Active stickers protecting vehicles on road
+                </p>
               </div>
 
-              {/* Card 4: Total Commission Earned */}
+              {/* Card 4: Pending Kitne Hain (Pending / Inactive / Blocked) */}
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    कुल कमाई (Total Commission)
+                    पेंडिंग / ब्लॉक (Pending / Blocked)
                   </span>
                   <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                    <DollarSign className="size-4.5" />
+                    <Clock className="size-4.5" />
                   </div>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-display font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                    ₹{metrics.totalCommissionEarned.toLocaleString('en-IN')}
+                  <span className="text-3xl font-display font-black text-amber-600 dark:text-amber-400 font-mono">
+                    {pendingCustomersCount}
                   </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">needs action</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                  Rate: <strong className="text-slate-700 dark:text-slate-200">₹{commissionRate}</strong> / vehicle sticker
+                  Suspended or incomplete profile tags
                 </p>
               </div>
+
             </div>
 
             {/* 
               ==================================================================
-              NEW: GRAPHS & PAYCHART SECTION (Fleet Category & Salary Breakdown)
+              GRAPHS & PAYCHART SECTION (Fleet Category & Salary Breakdown)
               ==================================================================
             */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
               
-              {/* Paychart 1: Fleet Category Distribution (Cars vs Bikes vs Commercial) */}
+              {/* Paychart 1: Fleet Category Distribution */}
               <div className="card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1188,14 +1262,14 @@ export default function SalesDashboard() {
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-[#1a1d2e]">
                     <span className="text-slate-500 dark:text-slate-400">Base Monthly Salary (फिक्स वेतन)</span>
                     <span className="font-mono font-bold text-ink">
-                      ₹{(stats?.payroll?.baseSalary || stats?.metrics?.baseSalary || 18000).toLocaleString('en-IN')}
+                      ₹{baseSalaryVal.toLocaleString('en-IN')}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-[#1a1d2e]">
-                    <span className="text-slate-500 dark:text-slate-400">Incentive Per Scanner (इंसेंटिव)</span>
+                    <span className="text-slate-500 dark:text-slate-400">Incentive Per Scanner (प्रति QR)</span>
                     <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      ₹{stats?.payroll?.incentivePerScanner || stats?.metrics?.incentivePerScanner || commissionRate} / unit
+                      ₹{incentivePerScannerVal} / QR
                     </span>
                   </div>
 
@@ -1209,17 +1283,14 @@ export default function SalesDashboard() {
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-[#1a1d2e]">
                     <span className="text-slate-500 dark:text-slate-400">Month Incentive Earned</span>
                     <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      +₹{((metrics.monthSales) * (stats?.payroll?.incentivePerScanner || stats?.metrics?.incentivePerScanner || commissionRate)).toLocaleString('en-IN')}
+                      +₹{(metrics.monthSales * incentivePerScannerVal).toLocaleString('en-IN')}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between pt-1 font-bold">
                     <span className="text-ink">Net Payable Salary (कुल वेतन):</span>
                     <span className="text-base font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
-                      ₹{(
-                        (stats?.payroll?.baseSalary || stats?.metrics?.baseSalary || 18000) +
-                        ((metrics.monthSales) * (stats?.payroll?.incentivePerScanner || stats?.metrics?.incentivePerScanner || commissionRate))
-                      ).toLocaleString('en-IN')}
+                      ₹{netPayableSalary.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>
@@ -1240,7 +1311,7 @@ export default function SalesDashboard() {
                   <button
                     type="button"
                     onClick={() => setActiveTab('reports')}
-                    className="text-[11px] font-bold text-brand-600 dark:text-cyan-400 hover:underline"
+                    className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline"
                   >
                     Full Reports →
                   </button>
@@ -1269,7 +1340,7 @@ export default function SalesDashboard() {
                           <div
                             className={`w-full rounded-t-lg transition-all duration-300 ${
                               bar.count > 0
-                                ? 'bg-gradient-to-t from-emerald-600 to-brand-500 shadow-sm shadow-emerald-500/30'
+                                ? 'bg-gradient-to-t from-emerald-600 to-purple-500 shadow-sm shadow-emerald-500/30'
                                 : 'bg-slate-200 dark:bg-[#1a1d2e]'
                             }`}
                             style={{ height: `${heightPercent}%` }}
@@ -1299,7 +1370,7 @@ export default function SalesDashboard() {
                       इस महीने की उपस्थिति व छुट्टियां (Attendance & Chutti Overview)
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Working days, leaves, and weekly offs summary for October 2026
+                      Working days, leaves, and weekly offs summary for {monthNameEn}
                     </p>
                   </div>
                 </div>
@@ -1315,9 +1386,9 @@ export default function SalesDashboard() {
                   <button
                     type="button"
                     onClick={() => setActiveTab('attendance')}
-                    className="text-xs font-bold text-brand-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
+                    className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
                   >
-                    <span>पूरा कैलेंडर देखें</span>
+                    <span>माई वर्क व कैलेंडर देखें</span>
                     <ChevronRight className="size-4" />
                   </button>
                 </div>
@@ -1354,271 +1425,278 @@ export default function SalesDashboard() {
               </div>
             </div>
 
-            {/* Quick Preview: Recent Onboarded Customers */}
-            <div className="card p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-display font-bold text-base text-ink">Recent Customer Onboardings</h3>
-                  <p className="text-xs text-slate-500">Quick list of vehicle owners registered recently</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('customers')}
-                  className="btn-ghost !text-xs font-bold text-brand-600 dark:text-cyan-400"
-                >
-                  View All {customers.length} Customers →
-                </button>
-              </div>
-
-              <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-[#1f2333]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase text-[10px] border-b border-slate-200 dark:border-[#22253a]">
-                    <tr>
-                      <th className="py-2.5 px-3">Customer</th>
-                      <th className="py-2.5 px-3">Mobile</th>
-                      <th className="py-2.5 px-3">Vehicle Plate</th>
-                      <th className="py-2.5 px-3">Model</th>
-                      <th className="py-2.5 px-3">Tag Code</th>
-                      <th className="py-2.5 px-3">Commission</th>
-                      <th className="py-2.5 px-3 text-right">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333]">
-                    {customers.slice(0, 5).map((c, idx) => (
-                      <tr key={c._id || idx} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
-                        <td className="py-2.5 px-3 font-bold text-ink">{c.name}</td>
-                        <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">+91 {c.phone}</td>
-                        <td className="py-2.5 px-3">
-                          <PlateBadge value={c.vehicleNumber} size="sm" />
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{c.vehicleModel}</td>
-                        <td className="py-2.5 px-3">
-                          <span className="font-mono font-bold text-brand-600 dark:text-cyan-400 bg-brand-50 dark:bg-brand-950/80 px-2 py-0.5 rounded text-[11px]">
-                            {c.tagCode}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 font-bold text-emerald-600 font-mono">+₹{commissionRate}</td>
-                        <td className="py-2.5 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleViewCustomer(c)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-[#1f2333] transition"
-                            title="View Customer Dossier"
-                          >
-                            <Eye className="size-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
           </div>
         )}
 
         {/* 
           ======================================================================
-          TAB 2: MY ONBOARDED CUSTOMERS (USERS LIST & DETAILS WITH EYE BUTTON)
+          TAB 2: MY ONBOARDED USERS (USERS LIST, EDIT, EYE DOSSIER & BLOCK)
           ======================================================================
         */}
         {activeTab === 'customers' && (
-          <div className="card overflow-hidden p-4 sm:p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-display font-bold text-lg sm:text-xl text-ink">
-                    My Onboarded Customers
-                  </h2>
-                  <span className="bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-cyan-400 border border-brand-200 dark:border-brand-800 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                    {filteredCustomers.length} total
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Vehicle owners registered directly through your field sales account with pre-printed QR stickers.
-                </p>
-              </div>
-
-              {/* Action and Filters */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                {/* Vehicle Type Filter */}
-                <select
-                  value={vehicleFilter}
-                  onChange={(e) => setVehicleFilter(e.target.value)}
-                  className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
-                >
-                  <option value="ALL">All Vehicle Types</option>
-                  <option value="Car">Cars</option>
-                  <option value="Two-Wheeler">Two-Wheelers</option>
-                  <option value="Commercial">Commercial</option>
-                </select>
-
-                {/* Search Bar */}
-                <div className="relative min-w-[220px]">
-                  <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search name, phone, plate, tag..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-9 pr-3.5 py-2 text-xs text-ink dark:text-white focus:outline-none"
-                  />
-                </div>
-
+          <div className="space-y-4">
+            
+            {/* Quick Status Count Filter Pills */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddCustomerModal(true)}
-                  className="btn-primary !py-2 !px-3 text-xs font-bold"
+                  onClick={() => setCustomerStatusFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    customerStatusFilter === 'ALL'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#181b28] text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                  }`}
                 >
-                  + Add User
+                  All Users ({customers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomerStatusFilter('ACTIVE')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    customerStatusFilter === 'ACTIVE'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100'
+                  }`}
+                >
+                  Active Users ({activeCustomersCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomerStatusFilter('BLOCKED')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    customerStatusFilter === 'BLOCKED'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100'
+                  }`}
+                >
+                  Blocked Users ({pendingCustomersCount})
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddCustomerModal(true)}
+                className="btn-primary !py-2 !px-4 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="size-3.5" />
+                <span>+ Add / Onboard User</span>
+              </button>
             </div>
 
-            {loading ? (
-              <div className="py-12 text-center text-xs text-slate-500">
-                Loading customer records...
-              </div>
-            ) : filteredCustomers.length === 0 ? (
-              <div className="py-12 text-center space-y-3">
-                <div className="size-12 rounded-2xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-cyan-400 grid place-items-center mx-auto">
-                  <Users className="size-6" />
+            {/* Main Customer Table Card */}
+            <div className="card overflow-hidden p-4 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display font-bold text-lg sm:text-xl text-ink">
+                    मेरे द्वारा जोड़े गए उपभोक्ता (Joined Users List)
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Vehicle owners registered directly through your field sales account with pre-printed QR stickers.
+                  </p>
                 </div>
-                <h3 className="font-bold text-ink text-sm">No customers matched</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                  Try changing your search terms or click "+ Add User" to onboard a vehicle owner on the spot.
-                </p>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <select
+                    value={vehicleFilter}
+                    onChange={(e) => setVehicleFilter(e.target.value)}
+                    className="rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
+                  >
+                    <option value="ALL">All Vehicle Types</option>
+                    <option value="Car">Cars</option>
+                    <option value="Two-Wheeler">Two-Wheelers</option>
+                    <option value="Commercial">Commercial</option>
+                  </select>
+
+                  <div className="relative min-w-[220px]">
+                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search name, phone, plate, tag..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] pl-9 pr-3.5 py-2 text-xs text-ink dark:text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-[#1f2333]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
-                    <tr>
-                      <th className="py-3 px-3">#</th>
-                      <th className="py-3 px-4">Customer Name</th>
-                      <th className="py-3 px-4">Mobile</th>
-                      <th className="py-3 px-4">Vehicle Plate</th>
-                      <th className="py-3 px-4">Model & Type</th>
-                      <th className="py-3 px-4">Assigned QR Tag</th>
-                      <th className="py-3 px-3">Blood Group</th>
-                      <th className="py-3 px-3">Date</th>
-                      <th className="py-3 px-3">Commission</th>
-                      <th className="py-3 px-3">Status</th>
-                      <th className="py-3 px-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
-                    {filteredCustomers.map((c, idx) => (
-                      <tr key={c._id || idx} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
-                        <td className="py-3 px-3 font-mono text-[11px] text-slate-400">{idx + 1}</td>
-                        
-                        <td className="py-3 px-4 font-bold text-ink">
-                          <div className="flex items-center gap-2">
-                            <div className="size-7 rounded-full bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-cyan-400 font-bold grid place-items-center text-xs uppercase shrink-0">
-                              {c.name?.slice(0, 2) || 'CU'}
-                            </div>
-                            <div>
-                              <span>{c.name}</span>
-                              <span className="text-[10px] text-slate-400 block font-normal">{c.email || 'No email'}</span>
-                            </div>
-                          </div>
-                        </td>
 
-                        <td className="py-3 px-4 font-mono font-medium">+91 {c.phone}</td>
-
-                        <td className="py-3 px-4">
-                          <PlateBadge value={c.vehicleNumber} size="sm" />
-                        </td>
-
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                          <div>
-                            <span className="font-semibold block">{c.vehicleModel}</span>
-                            <span className="text-[10px] text-slate-400">{c.vehicleType} • {c.vehicleColor || 'White'}</span>
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <span className="font-mono font-bold text-brand-600 dark:text-cyan-400 bg-brand-50 dark:bg-brand-950/80 px-2 py-0.5 rounded-md border border-brand-200 dark:border-brand-800 text-[11px]">
-                            {c.tagCode}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 rounded-md text-[10px]">
-                            {c.bloodGroup || 'B+'}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
-                          {c.onboardedAt ? new Date(c.onboardedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recent'}
-                        </td>
-
-                        <td className="py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400 text-xs font-mono">
-                          +₹{commissionRate}
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                            <CheckCircle2 className="size-3" />
-                            <span>Active</span>
-                          </span>
-                        </td>
-
-                        {/* Action buttons: Eye (Details), Edit (Update), Delete */}
-                        <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Eye Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleViewCustomer(c)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/60 border border-slate-200 dark:border-[#22253a] transition"
-                              title="👁️ View Full Customer Dossier"
-                            >
-                              <Eye className="size-3.5" />
-                            </button>
-
-                            {/* Edit Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditCustomer(c)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-[#22253a] transition"
-                              title="✏️ Edit & Update Customer"
-                            >
-                              <Edit className="size-3.5" />
-                            </button>
-
-                            {/* Delete Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCustomer(c._id, c.name)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-[#22253a] transition"
-                              title="🗑️ Delete Customer & Release Sticker"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </div>
-                        </td>
+              {loading ? (
+                <div className="py-12 text-center text-xs text-slate-500">
+                  Loading customer records...
+                </div>
+              ) : filteredCustomers.length === 0 ? (
+                <div className="py-12 text-center space-y-3">
+                  <div className="size-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 grid place-items-center mx-auto">
+                    <Users className="size-6" />
+                  </div>
+                  <h3 className="font-bold text-ink text-sm">No customers matched</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Try changing your search terms or click "+ Add User" to onboard a vehicle owner on the spot.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-[#1f2333]">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-[#22253a]">
+                      <tr>
+                        <th className="py-3 px-3">#</th>
+                        <th className="py-3 px-4">Customer Name</th>
+                        <th className="py-3 px-4">Mobile</th>
+                        <th className="py-3 px-4">Vehicle Plate</th>
+                        <th className="py-3 px-4">Model & Type</th>
+                        <th className="py-3 px-4">Assigned QR Tag</th>
+                        <th className="py-3 px-3">Blood Group</th>
+                        <th className="py-3 px-3">Date</th>
+                        <th className="py-3 px-3">Commission</th>
+                        <th className="py-3 px-3">Status</th>
+                        <th className="py-3 px-3 text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
+                      {filteredCustomers.map((c, idx) => {
+                        const isBlocked = c.status === 'BLOCKED' || c.status === 'INACTIVE' || c.isActive === false;
+
+                        return (
+                          <tr key={c._id || idx} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
+                            <td className="py-3 px-3 font-mono text-[11px] text-slate-400">{idx + 1}</td>
+                            
+                            <td className="py-3 px-4 font-bold text-ink">
+                              <div className="flex items-center gap-2">
+                                <div className="size-7 rounded-full bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400 font-bold grid place-items-center text-xs uppercase shrink-0">
+                                  {c.name?.slice(0, 2) || 'CU'}
+                                </div>
+                                <div>
+                                  <span>{c.name}</span>
+                                  <span className="text-[10px] text-slate-400 block font-normal">{c.email || 'No email'}</span>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4 font-mono font-medium">+91 {c.phone}</td>
+
+                            <td className="py-3 px-4">
+                              <PlateBadge value={c.vehicleNumber} size="sm" />
+                            </td>
+
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                              <div>
+                                <span className="font-semibold block">{c.vehicleModel}</span>
+                                <span className="text-[10px] text-slate-400">{c.vehicleType} • {c.vehicleColor || 'White'}</span>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span className="font-mono font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/80 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800 text-[11px]">
+                                {c.tagCode}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-3">
+                              <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 rounded-md text-[10px]">
+                                {c.bloodGroup || 'B+'}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
+                              {c.onboardedAt ? new Date(c.onboardedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recent'}
+                            </td>
+
+                            <td className="py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400 text-xs font-mono">
+                              +₹{commissionRate}
+                            </td>
+
+                            <td className="py-3 px-3">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                isBlocked
+                                  ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                              }`}>
+                                {isBlocked ? (
+                                  <>
+                                    <XCircle className="size-3" />
+                                    <span>Blocked</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="size-3" />
+                                    <span>Active</span>
+                                  </>
+                                )}
+                              </span>
+                            </td>
+
+                            {/* Action buttons: Eye (Details), Edit (Update), Block/Unblock, Delete */}
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Eye Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewCustomer(c)}
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/60 border border-slate-200 dark:border-[#22253a] transition"
+                                  title="👁️ View Full Customer Dossier"
+                                >
+                                  <Eye className="size-3.5" />
+                                </button>
+
+                                {/* Edit Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditCustomer(c)}
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-[#22253a] transition"
+                                  title="✏️ Edit & Update Customer"
+                                >
+                                  <Edit className="size-3.5" />
+                                </button>
+
+                                {/* Block / Unblock Toggle Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCustomerBlock(c._id, c.status)}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition ${
+                                    isBlocked
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 hover:bg-emerald-100'
+                                      : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 hover:bg-rose-100'
+                                  }`}
+                                  title={isBlocked ? 'Unblock User' : 'Block User'}
+                                >
+                                  {isBlocked ? 'Unblock' : 'Block'}
+                                </button>
+
+                                {/* Delete Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustomer(c._id, c.name)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-[#22253a] transition"
+                                  title="🗑️ Delete Customer & Release Sticker"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* 
           ======================================================================
-          TAB 3: MY WORK & DUTY TRACKER ("ab tak kitne beche, konse din kam pe tha, konse din chutti, salary details")
+          TAB 3: MY WORK & PERFORMANCE (काम, कैलेंडर, छुट्टी व वेतन)
           ======================================================================
         */}
         {activeTab === 'attendance' && (
           <div className="space-y-6">
             
             {/* 1. Lifetime Performance & Salary / Incentive Calculator Card */}
-            <div className="card p-6 sm:p-7 bg-gradient-to-br from-brand-900 via-brand-800 to-slate-900 text-white rounded-3xl shadow-xl relative overflow-hidden">
-              <div className="absolute -top-12 -right-12 size-48 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+            <div className="card p-6 sm:p-7 bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-950 text-white rounded-3xl shadow-xl relative overflow-hidden border border-purple-800/40">
+              <div className="absolute -top-12 -right-12 size-48 rounded-full bg-purple-500/10 blur-2xl pointer-events-none" />
               <div className="absolute -bottom-8 -left-8 size-40 rounded-full bg-emerald-400/10 blur-xl pointer-events-none" />
 
               <div className="relative z-10 space-y-4">
@@ -1626,128 +1704,220 @@ export default function SalesDashboard() {
                   <div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-cyan-300 text-xs font-bold border border-white/10 mb-2">
                       <Briefcase className="size-3.5 text-cyan-300" />
-                      <span>My Work Performance & Salary Ledger</span>
+                      <span>My Work Performance, Calendar & Salary Ledger</span>
                     </div>
                     <h2 className="text-xl sm:text-2xl font-display font-extrabold text-white">
-                      अब तक कुल बिक्री व वेतन विवरण (Lifetime Sales & Salary Slip)
+                      माई वर्क: कार्य दिवस, कैलेंडर, छुट्टी व वेतन विवरण
                     </h2>
-                    <p className="text-xs sm:text-sm text-brand-100/90">
-                      Detailed account of total scanners sold so far, days on duty, leaves taken, and calculated salary with per-scanner incentives.
+                    <p className="text-xs sm:text-sm text-purple-100/90">
+                      Track how many days you worked, interactive attendance calendar, leaves taken, total scanners sold, and net salary payout.
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setShowAttendanceModal(true)}
-                    className="btn-primary !bg-white !text-brand-900 hover:!bg-brand-50 !py-2.5 !px-4 text-xs font-bold shadow-lg inline-flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+                    className="btn-primary !bg-white !text-purple-900 hover:!bg-purple-50 !py-2.5 !px-4 text-xs font-bold shadow-lg inline-flex items-center gap-1.5 self-start sm:self-auto shrink-0"
                   >
-                    <CalendarDays className="size-4 text-brand-700" />
+                    <CalendarDays className="size-4 text-purple-700" />
                     <span>+ उपस्थिति / छुट्टी दर्ज करें</span>
                   </button>
                 </div>
 
-                {/* 4 Metric Boxes Inside Header */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-                  <div className="p-4 rounded-2xl bg-white/10 border border-white/10">
-                    <span className="text-[11px] font-semibold text-brand-200 block uppercase">अब तक कुल बेचे (Lifetime Sold)</span>
-                    <div className="text-2xl sm:text-3xl font-display font-black text-white font-mono mt-1">
-                      {metrics.totalCustomers} <span className="text-xs font-normal text-brand-200">scanners</span>
+                {/* 6 Key Metric Boxes */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+                  {/* 1. Kaam Kiye Din */}
+                  <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+                    <span className="text-[10px] font-semibold text-purple-200 block uppercase">काम किए दिन (Present)</span>
+                    <div className="text-xl sm:text-2xl font-display font-black text-white font-mono mt-1">
+                      {attendanceData?.summary?.daysWorked || attendanceSummary.daysWorkedMonth} <span className="text-xs font-normal text-purple-200">Days</span>
                     </div>
-                    <span className="text-[10px] text-cyan-300 block mt-0.5">₹{(metrics.totalCustomers * commissionRate).toLocaleString('en-IN')} lifetime incentive</span>
+                    <span className="text-[10px] text-emerald-300 block mt-0.5">Active field duty</span>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-white/10 border border-white/10">
-                    <span className="text-[11px] font-semibold text-brand-200 block uppercase">फिक्स मासिक वेतन (Base Salary)</span>
-                    <div className="text-2xl sm:text-3xl font-display font-black text-white font-mono mt-1">
-                      ₹{(stats?.payroll?.baseSalary || stats?.metrics?.baseSalary || 18000).toLocaleString('en-IN')}
+                  {/* 2. Leaves / Chutti */}
+                  <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+                    <span className="text-[10px] font-semibold text-purple-200 block uppercase">छुट्टियां (Leaves)</span>
+                    <div className="text-xl sm:text-2xl font-display font-black text-rose-300 font-mono mt-1">
+                      {attendanceData?.summary?.leaves || attendanceSummary.leavesTakenMonth} <span className="text-xs font-normal text-rose-200">Days</span>
                     </div>
-                    <span className="text-[10px] text-emerald-300 block mt-0.5">Fixed Monthly Guarantee</span>
+                    <span className="text-[10px] text-rose-200 block mt-0.5">Casual & medical leaves</span>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-white/10 border border-white/10">
-                    <span className="text-[11px] font-semibold text-brand-200 block uppercase">प्रति स्कैनर इंसेंटिव (Incentive Rate)</span>
-                    <div className="text-2xl sm:text-3xl font-display font-black text-amber-300 font-mono mt-1">
-                      ₹{stats?.payroll?.incentivePerScanner || stats?.metrics?.incentivePerScanner || commissionRate}
+                  {/* 3. Total Scanners Sold */}
+                  <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+                    <span className="text-[10px] font-semibold text-purple-200 block uppercase">कुल स्कैनर सेल (Tags Sold)</span>
+                    <div className="text-xl sm:text-2xl font-display font-black text-cyan-300 font-mono mt-1">
+                      {metrics.totalTagsSold} <span className="text-xs font-normal text-purple-200">QRs</span>
                     </div>
-                    <span className="text-[10px] text-brand-200 block mt-0.5">Per activated sticker</span>
+                    <span className="text-[10px] text-cyan-200 block mt-0.5">Stickers activated</span>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-400/30">
-                    <span className="text-[11px] font-semibold text-emerald-200 block uppercase">कुल देय वेतन (Net Payable Salary)</span>
-                    <div className="text-2xl sm:text-3xl font-display font-black text-emerald-300 font-mono mt-1">
-                      ₹{(
-                        (stats?.payroll?.baseSalary || stats?.metrics?.baseSalary || 18000) +
-                        ((metrics.monthSales) * (stats?.payroll?.incentivePerScanner || stats?.metrics?.incentivePerScanner || commissionRate))
-                      ).toLocaleString('en-IN')}
+                  {/* 4. Incentive per Scanner QR */}
+                  <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+                    <span className="text-[10px] font-semibold text-purple-200 block uppercase">इंसेंटिव / QR (Incentive)</span>
+                    <div className="text-xl sm:text-2xl font-display font-black text-amber-300 font-mono mt-1">
+                      ₹{incentivePerScannerVal}
                     </div>
-                    <span className="text-[10px] text-emerald-200 block mt-0.5">Base + {metrics.monthSales}x Incentive</span>
+                    <span className="text-[10px] text-amber-200 block mt-0.5">per activated sticker</span>
+                  </div>
+
+                  {/* 5. Base Salary */}
+                  <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+                    <span className="text-[10px] font-semibold text-purple-200 block uppercase">फिक्स वेतन (Base Salary)</span>
+                    <div className="text-xl sm:text-2xl font-display font-black text-white font-mono mt-1">
+                      ₹{baseSalaryVal.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[10px] text-purple-200 block mt-0.5">Monthly Guarantee</span>
+                  </div>
+
+                  {/* 6. Total Net Payable Salary */}
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-semibold text-emerald-200 block uppercase">कुल देय वेतन (Net Total)</span>
+                    <div className="text-xl sm:text-2xl font-display font-black text-emerald-300 font-mono mt-1">
+                      ₹{netPayableSalary.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[10px] text-emerald-200 block mt-0.5">Base + {metrics.monthSales}x Inc.</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Header & Mark Attendance Action */}
+            {/* 
+              ==================================================================
+              INTERACTIVE ATTENDANCE & LEAVES CALENDAR GRID
+              ==================================================================
+            */}
             <div className="card p-5 sm:p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-display font-bold text-lg sm:text-xl text-ink">
-                      उपस्थिति व छुट्टी रिकॉर्ड (Duty Attendance & Leaves Tracker)
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
-                      October 2026
-                    </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1f2333] pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 grid place-items-center">
+                    <CalendarDays className="size-5" />
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Track which days you were on field duty (काम के दिन) and when you took leaves/holidays (छुट्टी विवरण)
-                  </p>
+                  <div>
+                    <h3 className="font-display font-bold text-base text-ink">
+                      मासिक उपस्थिति एवं छुट्टी कैलेंडर ({monthNameEn})
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Day-by-day visual calendar of working days, leaves taken, and weekly offs
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    {attendanceData?.summary?.daysWorked || attendanceSummary.daysWorkedMonth} Days Worked • {attendanceData?.summary?.leaves || attendanceSummary.leavesTakenMonth} Leaves
+                  </span>
                 </div>
               </div>
 
-              {/* 4 Summary Stat Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-2">
-                <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">काम किए दिन (Present)</span>
-                    <CheckCircle className="size-4 text-emerald-600 dark:text-emerald-400" />
+              {/* Calendar Days Header: Sun Mon Tue Wed Thu Fri Sat */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-bold text-slate-400 py-1">
+                {['Sun (रवि)', 'Mon (सोम)', 'Tue (मंगल)', 'Wed (बुध)', 'Thu (गुरु)', 'Fri (शुक्र)', 'Sat (शनि)'].map((day, idx) => (
+                  <div key={idx} className="py-1">
+                    <span className="hidden sm:inline">{day}</span>
+                    <span className="sm:hidden">{day.slice(0, 3)}</span>
                   </div>
-                  <div className="text-3xl font-display font-black text-emerald-700 dark:text-emerald-400 font-mono">
-                    {attendanceData?.summary?.daysWorked || attendanceSummary.daysWorkedMonth} Days
-                  </div>
-                  <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 block mt-1">Full working field duty</span>
-                </div>
+                ))}
+              </div>
 
-                <div className="p-4 rounded-2xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">छुट्टियां (Chutti / Leaves)</span>
-                    <Coffee className="size-4 text-rose-600 dark:text-rose-400" />
-                  </div>
-                  <div className="text-3xl font-display font-black text-rose-700 dark:text-rose-400 font-mono">
-                    {attendanceData?.summary?.leaves || attendanceSummary.leavesTakenMonth} Days
-                  </div>
-                  <span className="text-[11px] text-rose-600/80 dark:text-rose-400/80 block mt-1">Casual, sick & festival leaves</span>
-                </div>
+              {/* Calendar Grid Cells */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {/* Empty cells before month start */}
+                {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
+                  <div key={`empty-${idx}`} className="h-16 sm:h-20 rounded-xl bg-slate-50/40 dark:bg-[#12141f]/30 border border-transparent" />
+                ))}
 
-                <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">हाफ डे (Half Days)</span>
-                    <Clock className="size-4 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="text-3xl font-display font-black text-amber-700 dark:text-amber-400 font-mono">
-                    {attendanceData?.summary?.halfDays || 1} Day
-                  </div>
-                  <span className="text-[11px] text-amber-600/80 dark:text-amber-400/80 block mt-1">4 hours morning duty</span>
-                </div>
+                {/* Day cells 1..daysInCalMonth */}
+                {Array.from({ length: daysInCalMonth }).map((_, idx) => {
+                  const dayNum = idx + 1;
+                  const dayDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                  const dayOfWeek = (firstDayOfWeek + idx) % 7; // 0 = Sun
+                  const isSunday = dayOfWeek === 0;
+                  const rec = attendanceMap[dayDateStr];
+                  const isToday = currentDate.getDate() === dayNum && currentDate.getMonth() === calMonth && currentDate.getFullYear() === calYear;
 
-                <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">साप्ताहिक अवकाश (Sunday Offs)</span>
-                    <Calendar className="size-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="text-3xl font-display font-black text-blue-700 dark:text-blue-400 font-mono">
-                    {attendanceData?.summary?.weeklyOffs || attendanceSummary.weeklyOffsMonth} Days
-                  </div>
-                  <span className="text-[11px] text-blue-600/80 dark:text-blue-400/80 block mt-1">Weekly scheduled holidays</span>
+                  const status = rec ? rec.status : (isSunday ? 'WEEKLY_OFF' : (dayNum <= currentDate.getDate() ? 'PRESENT' : 'UNMARKED'));
+
+                  return (
+                    <div
+                      key={dayNum}
+                      className={`h-16 sm:h-20 p-1.5 sm:p-2 rounded-xl border flex flex-col justify-between transition-all ${
+                        isToday ? 'ring-2 ring-purple-500 shadow-sm' : ''
+                      } ${
+                        status === 'PRESENT'
+                          ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
+                          : status === 'LEAVE'
+                          ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/60'
+                          : status === 'HALF_DAY'
+                          ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60'
+                          : status === 'WEEKLY_OFF'
+                          ? 'bg-slate-100/70 dark:bg-[#161826] border-slate-200 dark:border-[#22253a]'
+                          : 'bg-white dark:bg-[#12141e] border-slate-200/60 dark:border-[#1a1d2e]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-mono font-bold ${
+                          isToday ? 'text-purple-600 dark:text-purple-400 font-extrabold' : 'text-slate-700 dark:text-slate-300'
+                        }`}>
+                          {dayNum}
+                        </span>
+                        {isToday && (
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-purple-600 text-white font-extrabold">Today</span>
+                        )}
+                      </div>
+
+                      <div className="truncate">
+                        {status === 'PRESENT' && (
+                          <div className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 truncate flex items-center gap-0.5">
+                            <CheckCircle2 className="size-2.5 shrink-0" />
+                            <span className="hidden sm:inline">Duty ({rec?.hoursWorked || 8}h)</span>
+                            <span className="sm:hidden">Duty</span>
+                          </div>
+                        )}
+                        {status === 'LEAVE' && (
+                          <div className="text-[10px] font-bold text-rose-700 dark:text-rose-400 truncate flex items-center gap-0.5" title={rec?.leaveReason || 'Leave'}>
+                            <Coffee className="size-2.5 shrink-0" />
+                            <span className="hidden sm:inline">{rec?.leaveType || 'Leave'}</span>
+                            <span className="sm:hidden">Leave</span>
+                          </div>
+                        )}
+                        {status === 'HALF_DAY' && (
+                          <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400 truncate flex items-center gap-0.5">
+                            <Clock className="size-2.5 shrink-0" />
+                            <span className="hidden sm:inline">Half Day</span>
+                            <span className="sm:hidden">Half</span>
+                          </div>
+                        )}
+                        {status === 'WEEKLY_OFF' && (
+                          <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                            <span className="hidden sm:inline">Sunday Off</span>
+                            <span className="sm:hidden">Off</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-100 dark:border-[#1f2333] text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-3 rounded-md bg-emerald-500" />
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">काम किए दिन (Present on Duty)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-3 rounded-md bg-rose-500" />
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">छुट्टी (Leave / Chutti)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-3 rounded-md bg-amber-500" />
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">हाफ डे (Half Day)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-3 rounded-md bg-slate-400" />
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">साप्ताहिक अवकाश (Sunday Off)</span>
                 </div>
               </div>
             </div>
@@ -1843,7 +2013,7 @@ export default function SalesDashboard() {
                             )}
                           </td>
 
-                          <td className="py-3 px-3 text-right font-mono font-bold text-brand-600 dark:text-cyan-400">
+                          <td className="py-3 px-3 text-right font-mono font-bold text-purple-600 dark:text-purple-400">
                             {r.stickersSold ? `+${r.stickersSold}` : '—'}
                           </td>
                         </tr>
@@ -1883,7 +2053,7 @@ export default function SalesDashboard() {
                     onClick={() => setReportPeriod('weekly')}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                       reportPeriod === 'weekly'
-                        ? 'bg-brand-600 text-white shadow-sm'
+                        ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-slate-600 dark:text-slate-400 hover:text-ink'
                     }`}
                   >
@@ -1894,7 +2064,7 @@ export default function SalesDashboard() {
                     onClick={() => setReportPeriod('monthly')}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                       reportPeriod === 'monthly'
-                        ? 'bg-brand-600 text-white shadow-sm'
+                        ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-slate-600 dark:text-slate-400 hover:text-ink'
                     }`}
                   >
@@ -1905,7 +2075,7 @@ export default function SalesDashboard() {
                     onClick={() => setReportPeriod('yearly')}
                     className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                       reportPeriod === 'yearly'
-                        ? 'bg-brand-600 text-white shadow-sm'
+                        ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-slate-600 dark:text-slate-400 hover:text-ink'
                     }`}
                   >
@@ -1948,13 +2118,10 @@ export default function SalesDashboard() {
                     >
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">{w.day}</span>
                       <strong className="text-xs font-mono block text-ink">{w.displayDate}</strong>
-                      <div className="text-2xl font-black font-display text-emerald-600 dark:text-emerald-400 mt-2">
+                      <div className="mt-2 text-xl font-display font-black text-emerald-600 font-mono">
                         {w.count}
                       </div>
-                      <span className="text-[10px] text-slate-500 block">users active</span>
-                      <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 font-mono block mt-1">
-                        +₹{w.commission}
-                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono block">₹{w.commission}</span>
                     </div>
                   ))}
                 </div>
@@ -1966,36 +2133,41 @@ export default function SalesDashboard() {
               <div className="card p-5 sm:p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display font-bold text-base text-ink">
-                    मासिक रिपोर्ट: October 2026 (Weekly Stages)
+                    मासिक रिपोर्ट (Current Month Progress)
                   </h3>
-                  <span className="text-xs font-mono text-emerald-600 font-bold">
-                    Month Total: {metrics.monthSales} Users • ₹{metrics.monthSales * commissionRate} Earned
+                  <span className="text-xs font-mono text-purple-600 dark:text-purple-400 font-bold">
+                    Target: {monthlyTarget} QRs • Achieved: {metrics.targetAchievedPercent}%
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {(reportsData?.monthly || []).map((m, idx) => (
-                    <div key={idx} className="p-4 rounded-2xl bg-white dark:bg-[#12141e] border border-slate-200 dark:border-[#1f2333] space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase text-slate-500">{m.week}</span>
-                        <Target className="size-4 text-brand-600 dark:text-cyan-400" />
-                      </div>
-                      <div className="text-3xl font-display font-black text-ink font-mono">
-                        {m.count} <span className="text-xs font-normal text-slate-400">users</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-[#1c1f2e]">
-                        <span className="text-slate-500">Commission</span>
-                        <strong className="text-emerald-600 font-mono font-bold">+₹{m.commission}</strong>
-                      </div>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
+                    <span className="text-xs font-bold text-purple-700 dark:text-purple-300 block">कुल स्टिकर बिक्री</span>
+                    <strong className="text-3xl font-display font-black text-purple-700 dark:text-purple-400 font-mono mt-1 block">
+                      {metrics.monthSales} QRs
+                    </strong>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 block">अर्जित इंसेंटिव</span>
+                    <strong className="text-3xl font-display font-black text-emerald-700 dark:text-emerald-400 font-mono mt-1 block">
+                      ₹{metrics.monthSales * commissionRate}
+                    </strong>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300 block">औसत दैनिक गति</span>
+                    <strong className="text-3xl font-display font-black text-blue-700 dark:text-blue-400 font-mono mt-1 block">
+                      {(metrics.monthSales / (attendanceSummary.daysWorkedMonth || 1)).toFixed(1)} QRs/day
+                    </strong>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* 3. YEARLY REPORT VIEW (12 Months Breakdown) */}
+            {/* 3. YEARLY REPORT VIEW */}
             {reportPeriod === 'yearly' && (
-              <div className="card overflow-hidden p-4 sm:p-6 space-y-4">
+              <div className="card p-5 sm:p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-display font-bold text-base text-ink">
@@ -2030,7 +2202,7 @@ export default function SalesDashboard() {
                           <tr key={idx} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
                             <td className="py-3 px-4 font-bold text-ink">{y.month} 2026</td>
                             <td className="py-3 px-4 font-mono text-slate-500">{y.target} stickers</td>
-                            <td className="py-3 px-4 font-mono font-bold text-brand-600 dark:text-cyan-400">{y.count}</td>
+                            <td className="py-3 px-4 font-mono font-bold text-purple-600 dark:text-purple-400">{y.count}</td>
                             <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300">{y.count}</td>
                             <td className="py-3 px-4 font-mono font-bold text-emerald-600">₹{y.commission}</td>
                             <td className="py-3 px-4 text-right">
@@ -2065,7 +2237,7 @@ export default function SalesDashboard() {
                     Registered Bank & UPI Payout Account
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Your monthly commissions and bonuses are directly wired to this verified bank account
+                    Your monthly salary and per-scanner incentives are directly wired to this verified bank account
                   </p>
                 </div>
               </div>
@@ -2093,7 +2265,7 @@ export default function SalesDashboard() {
                   <button
                     type="button"
                     onClick={() => handleCopy(bankDetails.accountNumber || '50100492810341', 'acc')}
-                    className="text-slate-400 hover:text-brand-600"
+                    className="text-slate-400 hover:text-purple-600"
                   >
                     {copiedText === 'acc' ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
                   </button>
@@ -2107,7 +2279,7 @@ export default function SalesDashboard() {
                   <button
                     type="button"
                     onClick={() => handleCopy(bankDetails.ifscCode || 'HDFC0000123', 'ifsc')}
-                    className="text-slate-400 hover:text-brand-600"
+                    className="text-slate-400 hover:text-purple-600"
                   >
                     {copiedText === 'ifsc' ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
                   </button>
@@ -2116,9 +2288,9 @@ export default function SalesDashboard() {
             </div>
 
             {/* UPI ID Banner */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-50 to-blue-50 dark:from-brand-950/40 dark:to-blue-950/40 border border-brand-200 dark:border-brand-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 border border-purple-200 dark:border-purple-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div>
-                <span className="text-[10px] uppercase font-bold text-brand-700 dark:text-cyan-400 block">Instant UPI VPA Handle</span>
+                <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-400 block">Instant UPI VPA Handle</span>
                 <strong className="font-mono text-ink dark:text-white text-sm font-bold">{bankDetails.upiId || 'sachin.gaikwad@okhdfcbank'}</strong>
               </div>
               <button
@@ -2152,22 +2324,43 @@ export default function SalesDashboard() {
               ✕
             </button>
 
-            <div className="flex items-center gap-3">
-              <div className="size-12 rounded-2xl bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-cyan-400 font-bold grid place-items-center text-lg uppercase shrink-0">
-                {selectedCustomer.name?.slice(0, 2) || 'CU'}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-display font-bold text-xl text-ink">
-                    {selectedCustomer.name}
-                  </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 border border-emerald-200 dark:border-emerald-800">
-                    Active User
-                  </span>
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1f2333] pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="size-12 rounded-2xl bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400 font-bold grid place-items-center text-lg uppercase shrink-0">
+                  {selectedCustomer.name?.slice(0, 2) || 'CU'}
                 </div>
-                <p className="text-xs text-slate-500 font-mono">
-                  +91 {selectedCustomer.phone} • Onboarded: {selectedCustomer.onboardedAt ? new Date(selectedCustomer.onboardedAt).toLocaleDateString('en-IN') : 'Recent'}
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display font-bold text-xl text-ink">
+                      {selectedCustomer.name}
+                    </h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      selectedCustomer.status === 'BLOCKED' || selectedCustomer.status === 'INACTIVE'
+                        ? 'bg-rose-50 dark:bg-rose-950 text-rose-600 border-rose-200 dark:border-rose-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-600 border border-emerald-200 dark:border-emerald-800'
+                    }`}>
+                      {selectedCustomer.status === 'BLOCKED' || selectedCustomer.status === 'INACTIVE' ? 'Blocked' : 'Active User'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-mono">
+                    +91 {selectedCustomer.phone} • Onboarded: {selectedCustomer.onboardedAt ? new Date(selectedCustomer.onboardedAt).toLocaleDateString('en-IN') : 'Recent'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons inside Dossier Header */}
+              <div className="flex items-center gap-2 pr-8">
+                <button
+                  type="button"
+                  onClick={() => handleToggleCustomerBlock(selectedCustomer._id, selectedCustomer.status)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                    selectedCustomer.status === 'BLOCKED' || selectedCustomer.status === 'INACTIVE'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                      : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                  }`}
+                >
+                  {selectedCustomer.status === 'BLOCKED' || selectedCustomer.status === 'INACTIVE' ? 'Unblock User' : 'Block User'}
+                </button>
               </div>
             </div>
 
@@ -2195,12 +2388,12 @@ export default function SalesDashboard() {
                 </div>
 
                 {/* Pre-Printed QR Tag Card */}
-                <div className="p-4 rounded-2xl bg-brand-50/70 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-900/60 space-y-2">
+                <div className="p-4 rounded-2xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-brand-700 dark:text-cyan-300">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
                       Assigned QR Scanner Sticker
                     </span>
-                    <span className="font-mono font-bold text-xs bg-brand-600 text-white px-2 py-0.5 rounded">
+                    <span className="font-mono font-bold text-xs bg-purple-600 text-white px-2 py-0.5 rounded">
                       {selectedCustomer.tagCode || selectedCustomer.tag?.tagCode}
                     </span>
                   </div>
@@ -2223,7 +2416,7 @@ export default function SalesDashboard() {
                             <strong className="text-ink text-xs block">{em.name}</strong>
                             <span className="text-[10px] text-slate-400">Relation: {em.relation}</span>
                           </div>
-                          <span className="font-mono font-bold text-xs text-brand-600 dark:text-cyan-400">+91 {em.phone}</span>
+                          <span className="font-mono font-bold text-xs text-purple-600 dark:text-purple-400">+91 {em.phone}</span>
                         </div>
                       ))}
                     </div>
@@ -2268,7 +2461,7 @@ export default function SalesDashboard() {
             </button>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 text-brand-600 dark:text-cyan-400 text-xs font-bold uppercase mb-1">
+              <div className="inline-flex items-center gap-1.5 text-purple-600 dark:text-purple-400 text-xs font-bold uppercase mb-1">
                 <Sparkles className="size-3.5" />
                 <span>On-Spot Vehicle Owner Registration</span>
               </div>
@@ -2317,27 +2510,27 @@ export default function SalesDashboard() {
               </div>
 
               {/* Pre-Printed Sticker & Plate */}
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-brand-50/70 dark:bg-brand-950/30 border border-brand-200/80 dark:border-brand-900/60">
+              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/60">
                 <div>
-                  <label className="block text-[11px] font-bold text-brand-700 dark:text-cyan-300 mb-1">Pre-Printed Sticker Code *</label>
+                  <label className="block text-[11px] font-bold text-purple-700 dark:text-purple-300 mb-1">Pre-Printed Sticker Code *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. MH-1025"
                     value={onboardForm.tagCode}
                     onChange={(e) => setOnboardForm({ ...onboardForm, tagCode: e.target.value.toUpperCase() })}
-                    className="w-full rounded-xl border border-brand-300 dark:border-brand-700 bg-white dark:bg-[#0b0d14] px-3 py-2 font-mono font-bold uppercase text-brand-600 dark:text-cyan-300"
+                    className="w-full rounded-xl border border-purple-300 dark:border-purple-700 bg-white dark:bg-[#0b0d14] px-3 py-2 font-mono font-bold uppercase text-purple-600 dark:text-purple-300"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-brand-700 dark:text-cyan-300 mb-1">Vehicle Plate Number *</label>
+                  <label className="block text-[11px] font-bold text-purple-700 dark:text-purple-300 mb-1">Vehicle Plate Number *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. MH 12 AB 1234"
                     value={onboardForm.vehicleNumber}
                     onChange={(e) => setOnboardForm({ ...onboardForm, vehicleNumber: e.target.value.toUpperCase() })}
-                    className="w-full rounded-xl border border-brand-300 dark:border-brand-700 bg-white dark:bg-[#0b0d14] px-3 py-2 font-mono font-bold uppercase text-ink dark:text-white"
+                    className="w-full rounded-xl border border-purple-300 dark:border-purple-700 bg-white dark:bg-[#0b0d14] px-3 py-2 font-mono font-bold uppercase text-ink dark:text-white"
                   />
                 </div>
               </div>
@@ -2395,7 +2588,7 @@ export default function SalesDashboard() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-primary w-full !py-2.5 text-xs font-bold shadow-md shadow-brand-500/20"
+                  className="btn-primary w-full !py-2.5 text-xs font-bold shadow-md shadow-purple-500/20"
                 >
                   {submitting ? 'Registering Customer & Activating...' : `Complete Onboarding & Claim Commission (+₹${commissionRate})`}
                 </button>
@@ -2515,7 +2708,7 @@ export default function SalesDashboard() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-primary w-full !py-2.5 text-xs font-bold shadow-md shadow-brand-500/20"
+                  className="btn-primary w-full !py-2.5 text-xs font-bold shadow-md shadow-purple-500/20"
                 >
                   उपस्थिति विवरण सुरक्षित करें
                 </button>
@@ -2549,7 +2742,7 @@ export default function SalesDashboard() {
                 Edit Customer Details
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Update customer contact info, vehicle specs and address. QR tag remains bound.
+                Update customer contact info, vehicle specs, and status. QR tag remains bound.
               </p>
             </div>
 
@@ -2589,21 +2782,14 @@ export default function SalesDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Blood Group</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
                   <select
-                    value={editCustomerForm.bloodGroup}
-                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, bloodGroup: e.target.value })}
-                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-ink dark:text-white font-bold text-rose-600"
+                    value={editCustomerForm.status}
+                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, status: e.target.value })}
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-ink dark:text-white font-bold"
                   >
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                    <option value="Unknown">Unknown</option>
+                    <option value="ACTIVE">ACTIVE (सक्रिय)</option>
+                    <option value="BLOCKED">BLOCKED (ब्लॉक)</option>
                   </select>
                 </div>
               </div>
@@ -2676,7 +2862,7 @@ export default function SalesDashboard() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-primary w-full !py-2.5 text-xs font-bold shadow-md shadow-brand-500/20"
+                  className="btn-primary w-full !py-2.5 text-xs font-bold shadow-md shadow-purple-500/20"
                 >
                   {submitting ? 'Saving Changes...' : 'Save & Update Customer'}
                 </button>

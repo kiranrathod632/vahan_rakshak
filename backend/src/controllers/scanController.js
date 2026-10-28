@@ -1,6 +1,7 @@
 const Tag = require('../models/Tag');
 const User = require('../models/User');
 const { checkDocumentExpiryStatus } = require('../services/notificationService');
+const { getClientBaseUrl } = require('../utils/urlHelper');
 
 /**
  * Mask vehicle number for privacy if enabled (e.g. MH19AB1234 -> MH19 ** 1234)
@@ -27,7 +28,7 @@ const getTagScanInfo = async (req, res, next) => {
     // Pre-printed Scanner Auto-Discovery:
     // If the physical QR sticker was pre-printed and scanned for the very first time
     if (!tag) {
-      const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+      const clientBaseUrl = getClientBaseUrl(req);
       tag = await Tag.create({
         tagCode: cleanTagCode,
         qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 const Tag = require('../models/Tag');
+const { getClientBaseUrl } = require('../utils/urlHelper');
 
 // Generate JWT token helper
 const generateToken = (id) => {
@@ -193,7 +194,7 @@ const register = async (req, res, next) => {
         linkedTag = existingTagForValidation || await Tag.findOne({ tagCode: cleanTagCode });
 
         if (!linkedTag) {
-          const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+          const clientBaseUrl = getClientBaseUrl(req);
           linkedTag = new Tag({
             tagCode: cleanTagCode,
             qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,
@@ -238,7 +239,7 @@ const register = async (req, res, next) => {
       linkedTag = existingTagForValidation || await Tag.findOne({ tagCode: providedTagCode });
 
       if (!linkedTag) {
-        const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+        const clientBaseUrl = getClientBaseUrl(req);
         linkedTag = new Tag({
           tagCode: providedTagCode,
           qrUrl: `${clientBaseUrl}/scan/${providedTagCode}`,
@@ -431,7 +432,7 @@ const addVehicle = async (req, res, next) => {
         });
       }
       if (!tag) {
-        const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+        const clientBaseUrl = getClientBaseUrl(req);
         tag = new Tag({
           tagCode: cleanTagCode,
           qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,

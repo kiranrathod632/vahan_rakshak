@@ -4,6 +4,7 @@ const Vehicle = require('../models/Vehicle');
 const Tag = require('../models/Tag');
 const TeamReport = require('../models/TeamReport');
 const Attendance = require('../models/Attendance');
+const { getClientBaseUrl } = require('../utils/urlHelper');
 
 /**
  * Helper to normalize date to YYYY-MM-DD string
@@ -530,7 +531,7 @@ const onboardCustomer = async (req, res, next) => {
 
     // 5. Claim / Create Tag
     let tag = await Tag.findOne({ tagCode: cleanTagCode });
-    const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+    const clientBaseUrl = getClientBaseUrl(req);
     const scanUrl = `${clientBaseUrl}/scan/${cleanTagCode}`;
 
     if (!tag) {

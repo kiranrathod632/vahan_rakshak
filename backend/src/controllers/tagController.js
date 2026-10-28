@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Vehicle = require('../models/Vehicle');
 const jwt = require('jsonwebtoken');
 const { checkDocumentExpiryStatus } = require('../services/notificationService');
+const { getClientBaseUrl } = require('../utils/urlHelper');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'gadiraksha_secret', {
@@ -27,7 +28,7 @@ const batchGenerateTags = async (req, res, next) => {
       codes = []
     } = req.body;
 
-    const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+    const clientBaseUrl = getClientBaseUrl(req);
     const cleanPrefix = (prefix || 'MH').toUpperCase().trim();
     const tagsCreated = [];
     const skippedCodes = [];
@@ -216,7 +217,7 @@ const registerAndClaim = async (req, res, next) => {
     // Pre-printed Physical Scanner support:
     // If the scanner sticker was pre-printed before being in DB, auto-create it as UNCLAIMED
     if (!tag) {
-      const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+      const clientBaseUrl = getClientBaseUrl(req);
       tag = new Tag({
         tagCode: cleanTagCode,
         qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,
@@ -461,12 +462,17 @@ const updatePurchaseStatus = async (req, res, next) => {
 const getMyTags = async (req, res, next) => {
   try {
     const tags = await Tag.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const clientBaseUrl = getClientBaseUrl(req);
 
     const enriched = tags.map((t) => {
       const docExpiry = checkDocumentExpiryStatus(t.documents);
       const isSubActive = t.purchaseInfo?.isPaid && (!t.purchaseInfo.validUntil || new Date() <= new Date(t.purchaseInfo.validUntil));
+      const obj = t.toObject();
+      if (clientBaseUrl && !clientBaseUrl.includes('localhost') && (!obj.qrUrl || obj.qrUrl.includes('localhost') || obj.qrUrl.includes('127.0.0.1'))) {
+        obj.qrUrl = `${clientBaseUrl}/scan/${obj.tagCode}`;
+      }
       return {
-        ...t.toObject(),
+        ...obj,
         isSubscriptionActive: isSubActive,
         documentExpiryStatus: docExpiry
       };
@@ -502,7 +508,7 @@ const buyScanner = async (req, res, next) => {
     } = req.body;
 
     const count = Math.min(Math.max(1, Number(quantity) || 1), 10);
-    const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+    const clientBaseUrl = getClientBaseUrl(req);
     const cleanPrefix = (prefix || 'MH').toUpperCase().trim();
 
     // Determine plan pricing
@@ -672,7 +678,7 @@ const claimTag = async (req, res, next) => {
 
     // Support pre-printed physical scanners not yet in database
     if (!tag) {
-      const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+      const clientBaseUrl = getClientBaseUrl(req);
       tag = new Tag({
         tagCode: cleanTagCode,
         qrUrl: `${clientBaseUrl}/scan/${cleanTagCode}`,

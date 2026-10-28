@@ -7,6 +7,7 @@ const TeamReport = require('../models/TeamReport');
 const Attendance = require('../models/Attendance');
 const SalaryPayment = require('../models/SalaryPayment');
 const { checkDocumentExpiryStatus } = require('../services/notificationService');
+const { getClientBaseUrl } = require('../utils/urlHelper');
 
 /**
  * @desc    Get Admin Dashboard Overview Stats & KPIs
@@ -184,13 +185,22 @@ const getAllScanners = async (req, res, next) => {
       .skip(skip)
       .limit(Number(limit));
 
+    const clientBaseUrl = getClientBaseUrl(req);
+    const sanitizedScanners = scanners.map(s => {
+      const doc = s.toObject ? s.toObject() : { ...s };
+      if (clientBaseUrl && !clientBaseUrl.includes('localhost') && (!doc.qrUrl || doc.qrUrl.includes('localhost') || doc.qrUrl.includes('127.0.0.1'))) {
+        doc.qrUrl = `${clientBaseUrl}/scan/${doc.tagCode}`;
+      }
+      return doc;
+    });
+
     res.json({
       success: true,
       total,
       page: Number(page),
       pages: Math.ceil(total / Number(limit)),
-      count: scanners.length,
-      data: scanners
+      count: sanitizedScanners.length,
+      data: sanitizedScanners
     });
   } catch (error) {
     next(error);
@@ -247,7 +257,7 @@ const batchGenerateScanners = async (req, res, next) => {
       codes = []
     } = req.body;
 
-    const clientBaseUrl = process.env.CLIENT_URL || process.env.APP_BASE_URL || 'http://localhost:5000';
+    const clientBaseUrl = getClientBaseUrl(req);
     const cleanPrefix = (prefix || 'MH').toUpperCase().trim();
     const tagsCreated = [];
     const skippedCodes = [];
@@ -564,9 +574,10 @@ const createAdminUser = async (req, res, next) => {
       const code = tagCode.toUpperCase().trim();
       let tag = await Tag.findOne({ tagCode: code });
       if (!tag) {
+        const clientBaseUrl = getClientBaseUrl(req);
         tag = await Tag.create({
           tagCode: code,
-          qrUrl: `http://localhost:5000/scan/${code}`,
+          qrUrl: `${clientBaseUrl}/scan/${code}`,
           status: 'ACTIVE',
           user: user._id,
           vehicle: newVehicle?._id || null,

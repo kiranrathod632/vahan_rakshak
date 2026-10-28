@@ -3,19 +3,19 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://vahan-rakshak-v4oe.vercel.app/api/$1"
+      "destination": "https://vahan-rakshak-106s.onrender.com/api/$1"
     },
     {
       "source": "/auth/(.*)",
-      "destination": "https://vahan-rakshak-v4oe.vercel.app/auth/$1"
+      "destination": "https://vahan-rakshak-106s.onrender.com/auth/$1"
     },
     {
       "source": "/tags/(.*)",
-      "destination": "https://vahan-rakshak-v4oe.vercel.app/tags/$1"
+      "destination": "https://vahan-rakshak-106s.onrender.com/tags/$1"
     },
     {
       "source": "/alerts/(.*)",
-      "destination": "https://vahan-rakshak-v4oe.vercel.app/alerts/$1"
+      "destination": "https://vahan-rakshak-106s.onrender.com/alerts/$1"
     },
     {
       "source": "/(.*)",

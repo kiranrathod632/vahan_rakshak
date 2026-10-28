@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
 const dns = require('dns');
 
-// Configure DNS resolvers for reliable MongoDB Atlas SRV connection on Windows
-try {
-  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1','0.0.0.0']);
-} catch (e) {
- 
+// Configure DNS resolvers for reliable MongoDB Atlas SRV connection on Windows only
+if (process.platform === 'win32' && !process.env.VERCEL) {
+  try {
+    dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+  } catch (e) {
+    // Ignore DNS errors
+  }
 }
 
 // Reduce buffer timeout so requests fail fast with clear message instead of hanging

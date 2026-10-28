@@ -765,7 +765,8 @@ export default function AdminDashboard() {
       const payload = {
         count: batchGenCount,
         prefix: batchGenPrefix,
-        mode: batchGenMode
+        mode: batchGenMode,
+        baseUrl: typeof window !== 'undefined' ? window.location.origin : undefined
       };
       if (batchGenStartNum && !isNaN(Number(batchGenStartNum))) {
         payload.startNumber = Number(batchGenStartNum);
@@ -790,6 +791,30 @@ export default function AdminDashboard() {
     }
   };
 
+  // Dynamic helpers to ensure printable QR code and scan link always use the live website domain
+  const getStickerScanUrl = (s) => {
+    if (!s) return '';
+    const code = s.tagCode || '';
+    if (typeof window !== 'undefined' && window.location.origin && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (!s.qrUrl || s.qrUrl.includes('localhost') || s.qrUrl.includes('127.0.0.1')) {
+        return `${window.location.origin}/scan/${code}`;
+      }
+    }
+    return s.qrUrl || (typeof window !== 'undefined' ? `${window.location.origin}/scan/${code}` : `/scan/${code}`);
+  };
+
+  const getStickerQrImg = (s) => {
+    if (!s) return '';
+    const liveScanUrl = getStickerScanUrl(s);
+    const hasLocalUrl = s.qrUrl && (s.qrUrl.includes('localhost') || s.qrUrl.includes('127.0.0.1'));
+    const isLiveSite = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+    if (isLiveSite && (hasLocalUrl || !s.qrImageBase64)) {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(liveScanUrl)}`;
+    }
+    return s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(liveScanUrl)}`;
+  };
+
   // Dedicated Print / Save as PDF function for physical vehicle stickers
   const handlePrintSheet = (stickersToPrint) => {
     const list = stickersToPrint && stickersToPrint.length > 0 ? stickersToPrint : (generatedStickersList.length > 0 ? generatedStickersList : scanners);
@@ -805,7 +830,7 @@ export default function AdminDashboard() {
     }
 
     const stickerHtml = list.map(s => {
-      const qrImg = s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(s.qrUrl || `${window.location.origin}/scan/${s.tagCode}`)}`;
+      const qrImg = getStickerQrImg(s);
       return `
         <div class="sticker-card">
           <div class="left-section">
@@ -1933,7 +1958,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-200">
                   {scanners.map((s) => {
-                    const qrImg = s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(s.qrUrl || `${window.location.origin}/scan/${s.tagCode}`)}`;
+                    const qrImg = getStickerQrImg(s);
                     return (
                       <tr key={s._id} className="hover:bg-slate-50/70 dark:hover:bg-[#161826] transition">
                         <td className="py-2.5 px-4">
@@ -4007,7 +4032,7 @@ export default function AdminDashboard() {
             {/* Scrollable Preview Grid of Physical Sticker Cards */}
             <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-1 md:grid-cols-2 gap-4">
               {generatedStickersList.map((s) => {
-                const qrImg = s.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(s.qrUrl || `${window.location.origin}/scan/${s.tagCode}`)}`;
+                const qrImg = getStickerQrImg(s);
                 return (
                   <div key={s._id || s.tagCode} className="w-full bg-white rounded-2xl border-2 border-slate-900 shadow-md overflow-hidden flex flex-col text-slate-900 font-sans">
                     <div className="p-3.5 flex flex-col justify-between space-y-1.5 border-b border-slate-100">
@@ -4099,7 +4124,7 @@ export default function AdminDashboard() {
               <div className="bg-amber-400 p-4 flex flex-col items-center space-y-2">
                 <div className="bg-white p-2 rounded-xl border-2 border-slate-900 shadow-sm w-full max-w-[200px] flex flex-col items-center">
                   <img
-                    src={singlePrintSticker.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(singlePrintSticker.qrUrl || `${window.location.origin}/scan/${singlePrintSticker.tagCode}`)}`}
+                    src={getStickerQrImg(singlePrintSticker)}
                     alt={singlePrintSticker.tagCode}
                     className="size-40 object-contain mx-auto"
                   />
@@ -4136,7 +4161,7 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 onClick={() => {
-                  const qrImg = singlePrintSticker.qrImageBase64 || `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(singlePrintSticker.qrUrl || `${window.location.origin}/scan/${singlePrintSticker.tagCode}`)}`;
+                  const qrImg = getStickerQrImg(singlePrintSticker);
                   const a = document.createElement('a');
                   a.href = qrImg;
                   a.download = `${singlePrintSticker.tagCode}-GadiRaksha.png`;

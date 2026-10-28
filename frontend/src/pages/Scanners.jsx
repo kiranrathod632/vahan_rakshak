@@ -112,7 +112,7 @@ export default function Scanners() {
           'Content-Type': 'application/json',
           'X-ADMIN-KEY': 'gadiraksha_admin_secret_batch_gen_key_2026'
         },
-        body: JSON.stringify({ count: 1 })
+        body: JSON.stringify({ count: 1, baseUrl: typeof window !== 'undefined' ? window.location.origin : undefined })
       });
       const data = await res.json();
       if (data.success && data.data?.length > 0) {

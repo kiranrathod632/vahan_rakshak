@@ -245,6 +245,27 @@ export default function Register() {
         {/* ================= STEP 1: MOBILE & PASSWORD ================= */}
         {currentStep === 1 && (
           <div className="space-y-4 animate-in fade-in duration-200">
+            {/* Direct First-Time Scan Banner */}
+            {initialTagCode && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 grid place-items-center text-lg shrink-0">
+                    📦
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-200">
+                      <span>Physical QR Sticker Auto-Detected:</span>
+                      <span className="font-mono px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 font-extrabold">{initialTagCode}</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 dark:text-amber-400 mt-0.5">
+                      Pahli baar scan kiya gaya sticker link ho gaya hai. Bas apna naam aur password darj karke submit karein!
+                    </p>
+                  </div>
+                </div>
+                <CheckCircle2 className="size-5 text-amber-500 shrink-0 hidden sm:block" />
+              </div>
+            )}
+
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <Phone className="size-4 text-brand-600 dark:text-cyan-400" />
               <span>Step 1: Mobile Number & Password Setup</span>
@@ -343,20 +364,47 @@ export default function Register() {
             </div>
 
             {/* Step 1 Action */}
-            <div className="pt-4 flex justify-end border-t border-slate-100 dark:border-[#1f2333]">
-              <button
-                type="button"
-                onClick={() => {
-                  setError('');
-                  if (validateStep1()) {
-                    setCurrentStep(2);
-                  }
-                }}
-                className="btn-primary !py-2.5 !px-6 text-xs font-bold shadow-md shadow-brand-500/25 flex items-center gap-2"
-              >
-                <span>Proceed to Scan QR Scanner</span>
-                <ChevronRight className="size-4" />
-              </button>
+            <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 dark:border-[#1f2333]">
+              {formData.tagCode ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (validateStep1()) setCurrentStep(2);
+                    }}
+                    className="text-xs text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-cyan-400 underline font-semibold"
+                  >
+                    Scan a different QR sticker
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleCompleteRegistration(formData.tagCode)}
+                    className="btn-primary !bg-amber-500 hover:!bg-amber-600 !text-slate-950 !py-2.5 !px-6 text-xs font-extrabold shadow-lg shadow-amber-500/25 flex items-center gap-2 w-full sm:w-auto justify-center"
+                  >
+                    <Sparkles className="size-4" />
+                    <span>{loading ? 'Activating Sticker & Creating Account...' : `Register & Activate Sticker (${formData.tagCode})`}</span>
+                    <ChevronRight className="size-4" />
+                  </button>
+                </>
+              ) : (
+                <div className="w-full flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError('');
+                      if (validateStep1()) {
+                        setCurrentStep(2);
+                      }
+                    }}
+                    className="btn-primary !py-2.5 !px-6 text-xs font-bold shadow-md shadow-brand-500/25 flex items-center gap-2 w-full sm:w-auto justify-center"
+                  >
+                    <span>Proceed to Scan QR Scanner</span>
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

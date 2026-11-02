@@ -17,6 +17,9 @@
 .dark .text-ink {
   color: #ffffff !important;
 }
+.dark .hover\:text-ink:hover {
+  color: #ffffff !important;
+}
 
 /* Custom UI Classes matching vehicle-qr-scanner design with dark theme support */
 .card {
@@ -51,4 +54,128 @@
 
 .pulse-sos {
   animation: pulse-ring 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ==========================================================================
+   HIGH CONTRAST & VISIBILITY ENHANCEMENTS FOR DARK MODE ACROSS ALL DEVICES
+   ========================================================================== */
+
+/* Automatically ensure dark-on-dark text is bright & readable when missing explicit dark: variants */
+.dark .text-slate-900:not([class*="dark:text-"]) {
+  color: #f8fafc;
+}
+.dark .text-slate-800:not([class*="dark:text-"]) {
+  color: #f1f5f9;
+}
+.dark .text-slate-700:not([class*="dark:text-"]) {
+  color: #e2e8f0;
+}
+.dark .text-slate-600:not([class*="dark:text-"]) {
+  color: #cbd5e1;
+}
+
+.dark .text-gray-900:not([class*="dark:text-"]) {
+  color: #f8fafc;
+}
+.dark .text-gray-800:not([class*="dark:text-"]) {
+  color: #f1f5f9;
+}
+.dark .text-gray-700:not([class*="dark:text-"]) {
+  color: #e2e8f0;
+}
+.dark .text-gray-600:not([class*="dark:text-"]) {
+  color: #cbd5e1;
+}
+
+.dark .text-zinc-900:not([class*="dark:text-"]) {
+  color: #f4f4f5;
+}
+.dark .text-zinc-800:not([class*="dark:text-"]) {
+  color: #e4e4e7;
+}
+.dark .text-zinc-700:not([class*="dark:text-"]) {
+  color: #d4d4d8;
+}
+
+/* Badge & Alert text contrast: ensure dark alert texts transform to bright legible tones in dark mode */
+.dark .text-amber-900:not([class*="dark:text-"]) {
+  color: #fde68a;
+}
+.dark .text-amber-800:not([class*="dark:text-"]) {
+  color: #fef08a;
+}
+.dark .text-emerald-900:not([class*="dark:text-"]) {
+  color: #a7f3d0;
+}
+.dark .text-emerald-800:not([class*="dark:text-"]) {
+  color: #6ee7b7;
+}
+.dark .text-rose-900:not([class*="dark:text-"]) {
+  color: #fecdd3;
+}
+.dark .text-rose-800:not([class*="dark:text-"]) {
+  color: #fda4af;
+}
+.dark .text-red-900:not([class*="dark:text-"]) {
+  color: #fecaca;
+}
+.dark .text-red-800:not([class*="dark:text-"]) {
+  color: #fca5a5;
+}
+.dark .text-sky-900:not([class*="dark:text-"]) {
+  color: #bae6fd;
+}
+.dark .text-sky-800:not([class*="dark:text-"]) {
+  color: #7dd3fc;
+}
+.dark .text-blue-900:not([class*="dark:text-"]) {
+  color: #bfdbfe;
+}
+.dark .text-indigo-900:not([class*="dark:text-"]) {
+  color: #c7d2fe;
+}
+.dark .text-purple-900:not([class*="dark:text-"]) {
+  color: #e9d5ff;
+}
+
+/* Ensure form dropdown options and inputs are fully legible in dark theme on mobile & desktop */
+.dark input,
+.dark select,
+.dark textarea {
+  color-scheme: dark;
+}
+
+.dark option {
+  background-color: #12141e !important;
+  color: #f8fafc !important;
+}
+
+/* Table text readability in dark mode */
+.dark table th {
+  color: #94a3b8;
+}
+.dark table td {
+  color: #e2e8f0;
+}
+
+/* Custom sleek scrollbar for tables and drawers across devices */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #272b3f;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3e4462;
 }

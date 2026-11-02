@@ -109,6 +109,16 @@ export default function PublicScan() {
     fetchScan();
   }, [tagCode]);
 
+  // Automatic first-time scan redirection to Register page
+  useEffect(() => {
+    if (!loading && scanData && (scanData.status === 'UNCLAIMED' || scanData.isFirstTimeScan)) {
+      if (!user) {
+        // Immediate redirection to Sign Up / Register page for first-time scanners
+        navigate(`/register?tagCode=${encodeURIComponent(tagCode)}`, { replace: true });
+      }
+    }
+  }, [loading, scanData, user, tagCode, navigate]);
+
   const handleTriggerAlert = async (type) => {
     setDispatching(true);
     setDispatchResult(null);
@@ -168,6 +178,40 @@ export default function PublicScan() {
 
   // First time scan of pre-printed unclaimed sticker
   if (scanData?.status === 'UNCLAIMED' || scanData?.isFirstTimeScan) {
+    // If not logged in, immediately render redirection banner while navigate executes
+    if (!user) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-[#0b0d14] text-slate-800 dark:text-white transition-colors duration-200">
+          <div className="text-center space-y-4 max-w-sm p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#12141e] border border-slate-200/90 dark:border-[#1f2333] shadow-2xl animate-in fade-in">
+            <div className="size-16 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 grid place-items-center mx-auto text-3xl animate-bounce">
+              📦
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-500/20">
+                Fresh Scanner ({tagCode})
+              </span>
+              <h2 className="text-xl font-bold font-display text-ink dark:text-white mt-2">
+                New Safety Sticker Detected
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                Opening account registration to link this physical sticker to your vehicle...
+              </p>
+            </div>
+            <div className="size-7 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/register?tagCode=${encodeURIComponent(tagCode)}`, { replace: true })}
+                className="text-xs text-brand-600 dark:text-cyan-400 hover:underline font-semibold"
+              >
+                Click here if not redirected automatically →
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const handleClaimForLoggedInUser = async (e) => {
       e.preventDefault();
       setClaiming(true);

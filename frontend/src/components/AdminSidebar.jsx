@@ -27,7 +27,7 @@ export default function AdminSidebar({ isOpen, onClose, collapsed = false, onTog
   const [searchParams] = useSearchParams();
 
   const currentTab = searchParams.get('tab') || 'overview';
-  const currentSub = searchParams.get('sub') || (currentTab === 'users' ? 'users' : '');
+  const currentSub = searchParams.get('sub') || (currentTab === 'users' ? 'overview' : (currentTab === 'team' ? 'overview' : ''));
   const currentStatus = searchParams.get('status') || 'ALL';
   const currentVStatus = searchParams.get('vstatus') || 'ALL';
   const currentTStatus = searchParams.get('tstatus') || 'ALL';
@@ -249,7 +249,7 @@ export default function AdminSidebar({ isOpen, onClose, collapsed = false, onTog
             {collapsed ? (
               <button
                 type="button"
-                onClick={() => handleNav('users')}
+                onClick={() => handleNav('users', { sub: 'overview' })}
                 className="w-full flex justify-center p-2.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[#121420] hover:text-slate-900 dark:hover:text-white transition group relative"
                 title="User Management"
               >
@@ -262,9 +262,22 @@ export default function AdminSidebar({ isOpen, onClose, collapsed = false, onTog
               <div className="pl-6 space-y-0.5 mt-1 border-l border-slate-200 dark:border-[#1c2032] ml-4">
                 <button
                   type="button"
+                  onClick={() => handleNav('users', { sub: 'overview' })}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
+                    currentTab === 'users' && currentSub === 'overview'
+                      ? 'text-purple-700 dark:text-purple-400 font-bold bg-purple-50 dark:bg-[#141624]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
+                  }`}
+                >
+                  <span>User Overview</span>
+                  <LayoutDashboard className="size-3.5 opacity-60" />
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleNav('users', { sub: 'users', status: 'ALL' })}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
-                    currentTab === 'users' && currentSub === 'users' && currentStatus === 'ALL'
+                    currentTab === 'users' && currentSub === 'users'
                       ? 'text-purple-700 dark:text-purple-400 font-bold bg-purple-50 dark:bg-[#141624]'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
                   }`}
@@ -273,20 +286,18 @@ export default function AdminSidebar({ isOpen, onClose, collapsed = false, onTog
                   <Users className="size-3.5 opacity-60" />
                 </button>
 
-                {/* <button
+                <button
                   type="button"
                   onClick={() => handleNav('users', { sub: 'vehicles', vstatus: 'ALL' })}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
-                    currentTab === 'users' && currentSub === 'vehicles' && currentVStatus === 'ALL'
+                    currentTab === 'users' && currentSub === 'vehicles'
                       ? 'text-purple-700 dark:text-purple-400 font-bold bg-purple-50 dark:bg-[#141624]'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
                   }`}
                 >
                   <span>All Vehicles List</span>
                   <Car className="size-3.5 opacity-60" />
-                </button> */}
-
-       
+                </button>
               </div>
             )}
           </div>
@@ -314,7 +325,7 @@ export default function AdminSidebar({ isOpen, onClose, collapsed = false, onTog
             {collapsed ? (
               <button
                 type="button"
-                onClick={() => handleNav('team')}
+                onClick={() => handleNav('team', { sub: 'overview' })}
                 className="w-full flex justify-center p-2.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-[#121420] hover:text-slate-900 dark:hover:text-white transition group relative"
                 title="Team Management"
               >
@@ -327,49 +338,42 @@ export default function AdminSidebar({ isOpen, onClose, collapsed = false, onTog
               <div className="pl-6 space-y-0.5 mt-1 border-l border-slate-200 dark:border-[#1c2032] ml-4">
                 <button
                   type="button"
-                  onClick={() => handleNav('team', { tstatus: 'ALL' })}
+                  onClick={() => handleNav('team', { sub: 'overview' })}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
-                    currentTab === 'team' && currentTStatus === 'ALL'
+                    currentTab === 'team' && currentSub === 'overview'
                       ? 'text-purple-700 dark:text-purple-400 font-bold bg-purple-50 dark:bg-[#141624]'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
                   }`}
                 >
-                  <span>Employee List</span>
-                  <Briefcase className="size-3.5 opacity-60" />
+                  <span>Team Overview</span>
+                  <LayoutDashboard className="size-3.5 opacity-60" />
                 </button>
-{/* 
+
                 <button
                   type="button"
-                  onClick={() => handleNav('team', { action: 'add_team' })}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-[#121420] font-semibold transition flex items-center justify-between"
-                >
-                  <span>+ Add Employee</span>
-                  <Plus className="size-3.5" />
-                </button> */}
-
-                {/* <button
-                  type="button"
-                  onClick={() => handleNav('team', { tstatus: 'ACTIVE' })}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition ${
-                    currentTab === 'team' && currentTStatus === 'ACTIVE'
-                      ? 'text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/40'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
+                  onClick={() => handleNav('team', { sub: 'staff', tstatus: 'ALL' })}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
+                    currentTab === 'team' && currentSub === 'staff'
+                      ? 'text-purple-700 dark:text-purple-400 font-bold bg-purple-50 dark:bg-[#141624]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
                   }`}
                 >
-                  • Active Employees
-                </button> */}
+                  <span>Staff Directory</span>
+                  <Users className="size-3.5 opacity-60" />
+                </button>
 
-                {/* <button
+                <button
                   type="button"
-                  onClick={() => handleNav('team', { tstatus: 'BLOCKED' })}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition ${
-                    currentTab === 'team' && currentTStatus === 'BLOCKED'
-                      ? 'text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/40'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
+                  onClick={() => handleNav('team', { sub: 'payroll' })}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
+                    currentTab === 'team' && currentSub === 'payroll'
+                      ? 'text-purple-700 dark:text-purple-400 font-bold bg-purple-50 dark:bg-[#141624]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121420]'
                   }`}
                 >
-                  • Deactive / Blocked
-                </button> */}
+                  <span>Salary & Incentives</span>
+                  <Banknote className="size-3.5 opacity-60" />
+                </button>
               </div>
             )}
           </div>

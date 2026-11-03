@@ -293,7 +293,7 @@ const registerAndClaim = async (req, res, next) => {
       isPaid: purchaseInfo?.isPaid !== false,
       paymentStatus: purchaseInfo?.paymentStatus || 'PAID',
       plan: purchaseInfo?.plan || '1_YEAR_STANDARD',
-      amountPaid: purchaseInfo?.amountPaid || 299,
+      amountPaid: purchaseInfo?.amountPaid || 499,
       purchasedAt: new Date(),
       validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     };
@@ -512,7 +512,7 @@ const buyScanner = async (req, res, next) => {
     const cleanPrefix = (prefix || 'MH').toUpperCase().trim();
 
     // Determine plan pricing
-    let pricePerSticker = 299;
+    let pricePerSticker = 499;
     let planName = '1_YEAR_STANDARD';
     let validityDays = 365;
 
@@ -739,7 +739,7 @@ const claimTag = async (req, res, next) => {
       isPaid: true,
       paymentStatus: 'PAID',
       plan: '1_YEAR_STANDARD',
-      amountPaid: 299,
+      amountPaid: 499,
       purchasedAt: new Date(),
       validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     };

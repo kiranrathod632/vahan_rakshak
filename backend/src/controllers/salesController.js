@@ -820,7 +820,7 @@ const submitSalesReport = async (req, res, next) => {
       tasksSummary,
       stickersAssignedOrSold = 1,
       usersOnboarded = 1,
-      revenueGenerated = 299,
+      revenueGenerated = 499,
       hoursWorked = 8,
       leadsContacted = 5,
       notesAndFeedback = ''

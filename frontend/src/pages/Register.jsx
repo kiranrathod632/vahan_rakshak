@@ -53,16 +53,16 @@ export default function Register() {
   // Step 1 Validation
   const validateStep1 = () => {
     if (!formData.name.trim()) {
-      setError('Please enter your full name (पूरा नाम दर्ज करें)');
+      setError('Please enter your full name');
       return false;
     }
     const cleanPhone = formData.phone.trim().replace(/^(\+91[\s-]?|91[\s-]?)/, '').replace(/\D/g, '');
     if (cleanPhone.length !== 10) {
-      setError('Please enter a valid 10-digit mobile number (10 अंकों का मोबाइल नंबर दर्ज करें)');
+      setError('Please enter a valid 10-digit mobile number');
       return false;
     }
     if (!formData.password || formData.password.length < 6) {
-      setError('Password must be at least 6 characters long (पासवर्ड कम से कम 6 अक्षरों का होना चाहिए)');
+      setError('Password must be at least 6 characters long');
       return false;
     }
     if (formData.confirmPassword && formData.password !== formData.confirmPassword) {
@@ -273,7 +273,7 @@ export default function Register() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Full Name (पूरा नाम) *
+                Full Name *
               </label>
               <div className="relative">
                 <User className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -291,7 +291,7 @@ export default function Register() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Mobile Number (10 डिजिट मोबाइल नंबर) *
+                  Mobile Number (10-Digit) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
@@ -312,7 +312,7 @@ export default function Register() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Email Address (ईमेल - वैकल्पिक)
+                  Email Address (Optional)
                 </label>
                 <div className="relative">
                   <Mail className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -330,7 +330,7 @@ export default function Register() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Create Password (पासवर्ड) *
+                  Create Password *
                 </label>
                 <div className="relative">
                   <Lock className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -347,7 +347,7 @@ export default function Register() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Confirm Password (पासवर्ड दोबारा लिखें) *
+                  Confirm Password *
                 </label>
                 <div className="relative">
                   <Lock className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

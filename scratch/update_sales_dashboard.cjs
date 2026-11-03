@@ -217,7 +217,7 @@ export default function SalesDashboard() {
     tasksSummary: '',
     stickersAssignedOrSold: 2,
     usersOnboarded: 1,
-    revenueGenerated: 299,
+    revenueGenerated: 499,
     hoursWorked: 8,
     leadsContacted: 8,
     notesAndFeedback: ''
@@ -692,7 +692,7 @@ export default function SalesDashboard() {
       icon: Briefcase,
       badge: \`\${attendanceSummary.daysWorkedMonth}d\`,
       badgeColor: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-      desc: 'काम, कैलेंडर, छुट्टी व वेतन'
+      
     },
     {
       tab: 'reports',

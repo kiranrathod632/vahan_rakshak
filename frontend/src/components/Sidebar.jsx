@@ -122,7 +122,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <div className="flex items-center gap-1.5">
                 <span className="font-display font-extrabold text-lg text-ink dark:text-white">GadiRaksha</span>
                 <span className="text-[10px] font-semibold bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded border border-brand-200 dark:border-brand-800/60">
-                  गाडीरक्षा
+                  GadiRaksha
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-none mt-0.5">

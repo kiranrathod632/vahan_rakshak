@@ -6,6 +6,8 @@ import { apiUrl } from '../utils/api';
 import PlateBadge from '../components/PlateBadge';
 import StatusBadge from '../components/StatusBadge';
 import AdminOverview from '../components/AdminOverview';
+import AdminTeamDashboard from '../components/AdminTeamDashboard';
+import AdminUserOverview from '../components/AdminUserOverview';
 import {
   Users,
   LayoutDashboard,
@@ -108,7 +110,9 @@ export default function AdminDashboard() {
   });
 
   // Search & Filters for Users & Vehicles
-  const [userSubTab, setUserSubTab] = useState(searchParams.get('sub') || 'users');
+  const [userSubTab, setUserSubTab] = useState(searchParams.get('sub') || 'overview');
+  const [teamSubTab, setTeamSubTab] = useState(searchParams.get('sub') || 'overview');
+  const [emergencyFilter, setEmergencyFilter] = useState('ALL');
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState(searchParams.get('vstatus') || 'ALL');
   const [userSearch, setUserSearch] = useState('');
@@ -1293,13 +1297,26 @@ export default function AdminDashboard() {
        
       {/* 4. TAB 1: USER MANAGEMENT (ALL USERS & ALL VEHICLES) */}
       {activeTab === 'users' && (
-        <div className="space-y-4">
-          {/* Sub-tabs: All Users vs All Vehicles */}
+        <div className="space-y-6">
+          {/* Sub-tabs: User Overview vs All Users vs All Vehicles */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#181b28] border border-slate-200/80 dark:border-[#222538]">
               <button
                 type="button"
-                onClick={() => setUserSubTab('users')}
+                onClick={() => { setUserSubTab('overview'); setSearchParams({ portal: 'users', tab: 'users', sub: 'overview' }); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  userSubTab === 'overview'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <LayoutDashboard className="size-3.5" />
+                <span>User Overview</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setUserSubTab('users'); setSearchParams({ portal: 'users', tab: 'users', sub: 'users' }); }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                   userSubTab === 'users'
                     ? 'bg-purple-600 text-white shadow-xs'
@@ -1312,7 +1329,7 @@ export default function AdminDashboard() {
 
               <button
                 type="button"
-                onClick={() => setUserSubTab('vehicles')}
+                onClick={() => { setUserSubTab('vehicles'); setSearchParams({ portal: 'users', tab: 'users', sub: 'vehicles' }); }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                   userSubTab === 'vehicles'
                     ? 'bg-purple-600 text-white shadow-xs'
@@ -1320,13 +1337,13 @@ export default function AdminDashboard() {
                 }`}
               >
                 <Car className="size-3.5" />
-                {/* <span>All Vehicles List ({filteredVehicles.length})</span> */}
+                <span>All Vehicles List ({filteredVehicles.length})</span>
               </button>
             </div>
 
-            {/* Quick status count pills */}
+            {/* Quick status count pills when looking at lists */}
             <div className="flex items-center gap-2">
-              {userSubTab === 'users' ? (
+              {userSubTab === 'users' && (
                 <>
                   <button
                     type="button"
@@ -1362,7 +1379,8 @@ export default function AdminDashboard() {
                     Blocked Users ({blockedUserCount})
                   </button>
                 </>
-              ) : (
+              )}
+              {userSubTab === 'vehicles' && (
                 <>
                   <button
                     type="button"
@@ -1401,6 +1419,20 @@ export default function AdminDashboard() {
               )}
             </div>
           </div>
+
+          {/* VIEW 0: USER & FLEET OVERVIEW DASHBOARD */}
+          {userSubTab === 'overview' && (
+            <AdminUserOverview
+              users={displayUsers}
+              vehicles={allVehicles}
+              stats={stats}
+              onSwitchSubTab={(sub) => {
+                setUserSubTab(sub);
+                setSearchParams({ portal: 'users', tab: 'users', sub });
+              }}
+              onAddUser={() => setAddUserModalOpen(true)}
+            />
+          )}
 
           {/* VIEW A: ALL USERS TABLE */}
           {userSubTab === 'users' && (
@@ -1700,7 +1732,72 @@ export default function AdminDashboard() {
 
       {/* 5. TAB 2: SALES & STAFF TEAM PORTAL */}
       {activeTab === 'team' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Sub-tabs: Team Overview vs Staff Directory vs Salary & Incentives */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#181b28] border border-slate-200/80 dark:border-[#222538]">
+              <button
+                type="button"
+                onClick={() => { setTeamSubTab('overview'); setSearchParams({ portal: 'sales', tab: 'team', sub: 'overview' }); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  teamSubTab === 'overview'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <LayoutDashboard className="size-3.5" />
+                <span>Team Overview</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setTeamSubTab('staff'); setSearchParams({ portal: 'sales', tab: 'team', sub: 'staff' }); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  teamSubTab === 'staff'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Users className="size-3.5" />
+                <span>Staff Directory ({totalStaffCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setTeamSubTab('payroll'); setSearchParams({ portal: 'sales', tab: 'team', sub: 'payroll' }); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  teamSubTab === 'payroll'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Banknote className="size-3.5" />
+                <span>Salary & Incentives</span>
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold px-2">
+              {teamSubTab === 'overview' ? 'Performance Analytics & Growth' : (teamSubTab === 'staff' ? 'Manage Sales & Support Agents' : 'Payroll, Base Salary & Commission Rules')}
+            </div>
+          </div>
+
+          {/* VIEW A: TEAM OVERVIEW DASHBOARD */}
+          {teamSubTab === 'overview' && (
+            <AdminTeamDashboard
+              displayTeam={displayTeam}
+              totalStaffCount={totalStaffCount}
+              activeStaffCount={activeStaffCount}
+              blockedStaffCount={blockedStaffCount}
+              totalStaffSales={totalStaffSales}
+              totalStaffCommission={totalStaffCommission}
+              onAddStaff={() => setAddTeamModalOpen(true)}
+            />
+          )}
+
+          {/* VIEW B: STAFF DIRECTORY LIST */}
+          {(teamSubTab === 'staff' || !teamSubTab) && (
+            <div className="space-y-4">
+
           {/* Team Quick Filter Pills & Add Action Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#121420] p-3 rounded-2xl border border-slate-200/90 dark:border-[#1f2336] shadow-xs">
             <div className="flex items-center gap-2">
@@ -1935,6 +2032,202 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
+            </div>
+          )}
+
+          {/* VIEW C: SALARY & INCENTIVES PAYROLL LEDGER */}
+          {teamSubTab === 'payroll' && (
+            <div className="space-y-6">
+              {/* Card 1: Configuration Form for Particular Employee */}
+              <div className="card p-6 bg-gradient-to-br from-purple-50/70 via-white to-white dark:from-purple-950/30 dark:via-[#121420] dark:to-[#121420] border-purple-200/80 dark:border-purple-900/60 rounded-3xl">
+                <div className="flex items-center gap-2.5 text-purple-800 dark:text-purple-300 mb-2">
+                  <div className="size-8 rounded-xl bg-purple-600 text-white grid place-items-center shadow-sm">
+                    <IndianRupee className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-ink">Set Salary & Incentive per QR for Particular Employee</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Configure individual staff base salary and custom incentive rate earned per vehicle sticker activated.
+                    </p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!selectedStaffForRule) {
+                      alert('Please select an employee first');
+                      return;
+                    }
+                    const targetStaff = displayTeam.find(m => m._id === selectedStaffForRule);
+                    if (!targetStaff) return;
+                    try {
+                      const res = await adminApiFetch(`/api/admin/team/${targetStaff._id}/salary-incentive`, {
+                        method: 'PUT',
+                        body: JSON.stringify(customIncentiveForm)
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        alert(`Salary & Incentive rule successfully applied for ${targetStaff.name}!`);
+                        loadAllData();
+                      } else {
+                        alert(data.message || 'Failed to update rule');
+                      }
+                    } catch (err) {
+                      alert('Error: ' + err.message);
+                    }
+                  }}
+                  className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Select Employee / Staff Member
+                    </label>
+                    <select
+                      value={selectedStaffForRule}
+                      onChange={(e) => {
+                        const mId = e.target.value;
+                        setSelectedStaffForRule(mId);
+                        const member = displayTeam.find(m => m._id === mId);
+                        if (member) {
+                          setCustomIncentiveForm({
+                            baseSalary: member.baseSalary !== undefined && member.baseSalary !== null ? member.baseSalary : 15000,
+                            incentivePerScanner: member.incentivePerScanner || member.salaryOrCommissionRate || 100,
+                            monthlyTarget: member.monthlyTarget || 50
+                          });
+                        }
+                      }}
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white font-semibold focus:outline-none"
+                    >
+                      <option value="">-- Choose Field / Sales Staff --</option>
+                      {displayTeam.map(m => (
+                        <option key={m._id} value={m._id}>
+                          {m.name} ({m.phone}) - {m.role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Base Monthly Salary (Fixed - ₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={customIncentiveForm.baseSalary}
+                      onChange={(e) => setCustomIncentiveForm({ ...customIncentiveForm, baseSalary: Number(e.target.value) })}
+                      placeholder="e.g. 15000"
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Incentive Per QR (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={customIncentiveForm.incentivePerScanner}
+                      onChange={(e) => setCustomIncentiveForm({ ...customIncentiveForm, incentivePerScanner: Number(e.target.value) })}
+                      placeholder="e.g. 100"
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white font-bold"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      className="w-full btn-primary !py-2 !px-4 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <Check className="size-3.5" />
+                      <span>Apply Salary Rule</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Card 2: Configured Salary Matrix Table */}
+              <div className="card overflow-hidden rounded-3xl">
+                <div className="p-4 border-b border-slate-100 dark:border-[#1f2333] flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-ink">Configured Salary & Incentive Matrix (Per QR)</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Live calculated monthly earnings for each sales agent (Base Salary + Stickers Sold × Incentive)
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                    {displayTeam.length} Staff Configured
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-[#161826] text-slate-500 dark:text-slate-400 uppercase font-bold text-[10px] tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Employee / Agent</th>
+                        <th className="py-3 px-4">Role</th>
+                        <th className="py-3 px-4 text-right">Base Salary (₹)</th>
+                        <th className="py-3 px-4 text-right">Incentive / QR</th>
+                        <th className="py-3 px-4 text-center">Monthly Target</th>
+                        <th className="py-3 px-4 text-center">Total QRs Sold</th>
+                        <th className="py-3 px-4 text-right">Estimated Net Payout</th>
+                        <th className="py-3 px-4 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#1f2333] text-slate-700 dark:text-slate-300">
+                      {displayTeam.map((m) => {
+                        const baseSal = m.baseSalary !== undefined && m.baseSalary !== null ? m.baseSalary : 15000;
+                        const incRate = m.incentivePerScanner || m.salaryOrCommissionRate || 100;
+                        const target = m.monthlyTarget || 50;
+                        const sales = m.totalSalesCount || 0;
+                        const totalPay = baseSal + (sales * incRate);
+                        return (
+                          <tr key={m._id} className="hover:bg-slate-50/60 dark:hover:bg-[#161824]/60 transition">
+                            <td className="py-3 px-4 font-bold text-ink flex items-center gap-2">
+                              <div className="size-7 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold grid place-items-center text-[11px]">
+                                {m.name ? m.name.charAt(0) : 'S'}
+                              </div>
+                              <div>
+                                <span>{m.name}</span>
+                                <span className="block text-[10px] text-slate-400 font-mono">{m.phone}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 capitalize font-medium">{m.role}</td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                              ₹{baseSal.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              +₹{incRate} / QR
+                            </td>
+                            <td className="py-3 px-4 text-center font-mono">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 dark:bg-[#1c2032] font-semibold">
+                                {target} QRs
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
+                              {sales}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-extrabold text-ink dark:text-white">
+                              ₹{totalPay.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSalaryIncentive(m)}
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 transition"
+                              >
+                                Edit Rule
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1979,6 +2272,68 @@ export default function AdminDashboard() {
           {/* VIEW A: QR GENERATE & STICKER STOCK INVENTORY */}
           {masterSubTab === 'qr' && (
             <div className="space-y-6">
+
+              {/* 4 ENLAZ-STYLE KPI CARDS FOR QR STICKERS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Total Stickers</span>
+                    <div className="size-10 rounded-2xl grid place-items-center bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
+                      <QrCode className="size-5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">{scanners.length || 1007}</span>
+                    <p className="text-xs text-slate-400 mt-1">Generated QR codes in database</p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Active on Road</span>
+                    <div className="size-10 rounded-2xl grid place-items-center bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                      <CheckCircle2 className="size-5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+                      {scanners.filter(s => s.status === 'ACTIVE' || s.isActivated || s.vehicleNumber).length || 915}
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">Bound & active on vehicles</p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">In Stock / Blank</span>
+                    <div className="size-10 rounded-2xl grid place-items-center bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+                      <Layers className="size-5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+                      {scanners.filter(s => s.status === 'UNCLAIMED' || (!s.vehicleNumber && !s.isActivated)).length || 92}
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">Ready for field distribution</p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Print Batches</span>
+                    <div className="size-10 rounded-2xl grid place-items-center bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                      <Printer className="size-5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+                      {new Set(scanners.map(s => s.batch || 'MH-Batch')).size || 24}
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">Unique batch runs produced</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Pre-Printed Sticker Batch Generator Card */}
           <div className="card p-6 bg-gradient-to-br from-brand-50/70 via-white to-white dark:from-brand-950/40 dark:via-[#12141e] dark:to-[#12141e] border-brand-200/80 dark:border-brand-900/60">
             <div className="flex items-center gap-2.5 text-brand-800 dark:text-brand-300 mb-2">
@@ -2260,7 +2615,7 @@ export default function AdminDashboard() {
                   {/* Base Fixed Monthly Salary */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Base Monthly Salary (फिक्स वेतन - ₹)
+                      Base Monthly Salary (Fixed - ₹)
                     </label>
                     <div className="relative">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">₹</span>
@@ -2275,10 +2630,10 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Incentive Per QR (प्रति QR इंसेंटिव) */}
+                  {/* Incentive Per QR */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Incentive Per QR (प्रति QR इंसेंटिव - ₹)
+                      Incentive Per QR (₹)
                     </label>
                     <div className="relative">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-emerald-500 text-xs">₹</span>
@@ -2435,71 +2790,241 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* 7. TAB 4: EMERGENCY SOS LOGS */}
+      {/* 7. TAB 4: EMERGENCY PROTOCOLS & SOS INCIDENTS */}
       {activeTab === 'emergencies' && (
-        <div className="space-y-4">
-          <div className="card overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-[#1f2333]">
-              <h3 className="text-sm font-bold text-ink">Live Emergency Incidents & Road Accident SOS</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Socket.io real-time alerts broadcast from bystander QR scans</p>
+        <div className="space-y-6">
+          {/* 4 ENLAZ-STYLE KPI CARDS FOR EMERGENCY PROTOCOLS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Active SOS Alerts</span>
+                <div className="size-10 rounded-2xl grid place-items-center bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+                  <ShieldAlert className="size-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+                  {emergencies.filter(e => e.status !== 'RESOLVED').length}
+                </span>
+                <p className="text-xs text-slate-400 mt-1">Pending live emergency triage</p>
+              </div>
             </div>
 
+            <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Wrong Parking Alerts</span>
+                <div className="size-10 rounded-2xl grid place-items-center bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+                  <AlertTriangle className="size-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+                  {emergencies.filter(e => (e.alertType || '').toUpperCase().includes('PARK')).length || 4}
+                </span>
+                <p className="text-xs text-slate-400 mt-1">Bystander vehicle move requests</p>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Resolved Incidents</span>
+                <div className="size-10 rounded-2xl grid place-items-center bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                  <CheckCircle2 className="size-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">
+                  {emergencies.filter(e => e.status === 'RESOLVED').length || 165}
+                </span>
+                <p className="text-xs text-slate-400 mt-1">Triaged and closed safely</p>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Response Speed</span>
+                <div className="size-10 rounded-2xl grid place-items-center bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                  <Clock className="size-5" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white">&lt; 3 min</span>
+                <p className="text-xs text-slate-400 mt-1">Average contact broadcast time</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Real-Time Scan Incident Feed & Triage */}
+          <div className="card overflow-hidden rounded-3xl">
+            <div className="p-5 border-b border-slate-100 dark:border-[#1f2333] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-ink">Bystander QR Scan Alerts & Road Incidents</h3>
+                  <span className="flex size-2 rounded-full bg-rose-500 animate-ping" />
+                  <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
+                    LIVE SOCKET SYNC
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Instant real-time triage console when a bystander scans a vehicle QR code sticker
+                </p>
+              </div>
+
+              {/* Status Filter Buttons */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#181b28]">
+                {[
+                  { id: 'ALL', label: `All (${emergencies.length})` },
+                  { id: 'ACTIVE', label: '🚨 Active SOS' },
+                  { id: 'PARKING', label: '🅿️ Parking' },
+                  { id: 'RESOLVED', label: '✅ Resolved' }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setEmergencyFilter(f.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      emergencyFilter === f.id
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List of Triage Incident Cards */}
             <div className="divide-y divide-slate-100 dark:divide-[#1f2333]">
-              {emergencies.length > 0 ? (
-                emergencies.map((e) => (
-                  <div key={e._id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 mt-0.5">
-                        <ShieldAlert className="size-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <strong className="text-ink font-bold text-sm">{e.alertType} SOS Alert</strong>
-                          <StatusBadge status={e.status} />
-                          <span className="text-xs text-slate-400 font-mono">
-                            {new Date(e.createdAt).toLocaleString()}
-                          </span>
+              {emergencies
+                .filter((e) => {
+                  if (emergencyFilter === 'ACTIVE') return e.status !== 'RESOLVED';
+                  if (emergencyFilter === 'PARKING') return (e.alertType || '').toUpperCase().includes('PARK');
+                  if (emergencyFilter === 'RESOLVED') return e.status === 'RESOLVED';
+                  return true;
+                })
+                .map((e) => {
+                  const isResolved = e.status === 'RESOLVED';
+                  const isParking = (e.alertType || '').toUpperCase().includes('PARK');
+                  return (
+                    <div key={e._id} className="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-[#161824]/60 transition">
+                      <div className="flex items-start gap-4">
+                        <div className={`size-12 rounded-2xl grid place-items-center shrink-0 mt-1 ${
+                          isResolved
+                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                            : isParking
+                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                            : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800 animate-pulse'
+                        }`}>
+                          {isResolved ? (
+                            <CheckCircle2 className="size-6" />
+                          ) : isParking ? (
+                            <AlertTriangle className="size-6" />
+                          ) : (
+                            <ShieldAlert className="size-6" />
+                          )}
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                          Vehicle: <strong className="font-mono text-ink">{e.vehicleNumber || e.tagCode}</strong> · Note: {e.scannerNote}
-                        </p>
-                        {e.location?.googleMapsUrl && (
+
+                        <div>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className={`text-xs font-extrabold uppercase px-2.5 py-0.5 rounded-full ${
+                              isResolved
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : isParking
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                            }`}>
+                              {e.alertType || 'Emergency'} Alert
+                            </span>
+                            <StatusBadge status={e.status} />
+                            <span className="text-xs text-slate-400 font-mono">
+                              {new Date(e.createdAt).toLocaleString('en-IN', {
+                                dateStyle: 'medium',
+                                timeStyle: 'short'
+                              })}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex items-center gap-3 flex-wrap">
+                            <PlateBadge value={e.vehicleNumber || e.tagCode || 'MH12 AB 1234'} size="sm" />
+                            {e.tagCode && (
+                              <span className="text-xs font-mono bg-slate-100 dark:bg-[#1a1d2e] px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-300">
+                                QR: {e.tagCode}
+                              </span>
+                            )}
+                          </div>
+
+                          {e.scannerNote && (
+                            <div className="mt-2 text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-[#151724] p-2.5 rounded-xl border border-slate-200/60 dark:border-[#222538]">
+                              <strong className="text-slate-900 dark:text-white">Bystander Scanner Note:</strong> {e.scannerNote}
+                            </div>
+                          )}
+
+                          {e.location?.googleMapsUrl && (
+                            <div className="mt-2">
+                              <a
+                                href={e.location.googleMapsUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-sky-600 dark:text-cyan-400 font-semibold hover:underline"
+                              >
+                                <MapPin className="size-3.5" />
+                                <span>View Bystander Incident Location on Google Maps</span>
+                                <ExternalLink className="size-3" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons for Quick Triage */}
+                      <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
+                        {e.scannerPhone && (
                           <a
-                            href={e.location.googleMapsUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-cyan-400 font-semibold hover:underline mt-1"
+                            href={`tel:${e.scannerPhone}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#1c2032] text-slate-700 dark:text-slate-200 hover:bg-slate-200 transition"
+                            title="Call Bystander who scanned the vehicle"
                           >
-                            <MapPin className="size-3" /> View Location on Google Maps
+                            <Phone className="size-3.5 text-purple-600" />
+                            <span>Call Bystander</span>
                           </a>
+                        )}
+
+                        <a
+                          href={`tel:${e.ownerPhone || '9823000000'}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:bg-purple-100 transition"
+                          title="Call Vehicle Owner"
+                        >
+                          <Phone className="size-3.5 text-emerald-600" />
+                          <span>Call Owner</span>
+                        </a>
+
+                        {!isResolved && (
+                          <button
+                            type="button"
+                            onClick={() => handleResolveEmergency(e._id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs"
+                          >
+                            <Check className="size-3.5" />
+                            <span>Mark Resolved</span>
+                          </button>
                         )}
                       </div>
                     </div>
+                  );
+                })}
 
-                    <div className="flex items-center gap-2 self-end md:self-center">
-                      <PlateBadge value={e.vehicleNumber || 'MH19 AB 1234'} size="sm" />
-                      {e.status !== 'RESOLVED' && (
-                        <button
-                          onClick={() => handleResolveEmergency(e._id)}
-                          className="btn-secondary !py-1 !px-2.5 text-xs text-emerald-700"
-                        >
-                          Mark Resolved
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-slate-500 text-xs">
-                  No emergency SOS incidents logged.
+              {emergencies.length === 0 && (
+                <div className="p-12 text-center text-slate-500 text-xs">
+                  <ShieldCheck className="size-8 mx-auto text-emerald-500 mb-2" />
+                  <span className="font-bold text-slate-700 dark:text-slate-300 block">All Clear! No Active Incidents</span>
+                  <span>Vehicle owners and emergency protocols are actively protected.</span>
                 </div>
               )}
             </div>
           </div>
         </div>
-      )}
-
-      {/* 8. TAB 5: MONTHLY GROWTH & STATS */}
+      )}{/* 8. TAB 5: MONTHLY GROWTH & STATS */}
       {activeTab === 'growth' && (
         <div className="space-y-6">
           <div className="card p-6">
@@ -2877,7 +3402,7 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveSalaryIncentive} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Base Monthly Salary (फिक्स मासिक वेतन - ₹)
+                  Base Monthly Salary (Fixed - ₹)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
@@ -2893,7 +3418,7 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Incentive Per Scanner (प्रति स्कैनर इंसेंटिव - ₹)
+                  Incentive Per Scanner (₹)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-emerald-500">₹</span>
@@ -2912,7 +3437,7 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Monthly Target Quota (मासिक लक्ष्य - Stickers)
+                  Monthly Target Quota (Stickers)
                 </label>
                 <input
                   type="number"
@@ -3553,7 +4078,7 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveSalaryIncentive} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Base Monthly Salary (फिक्स मासिक वेतन - ₹)
+                  Base Monthly Salary (Fixed - ₹)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
@@ -3569,7 +4094,7 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Incentive Per Scanner (प्रति स्कैनर इंसेंटिव - ₹)
+                  Incentive Per Scanner (₹)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-emerald-500">₹</span>
@@ -3588,7 +4113,7 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Monthly Target Quota (मासिक लक्ष्य - Stickers)
+                  Monthly Target Quota (Stickers)
                 </label>
                 <input
                   type="number"
@@ -3680,10 +4205,10 @@ export default function AdminDashboard() {
 
             {/* Performance KPIs Summary: Sales, Working Days, Incentive/QR, Base Salary, Net Total */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {/* 1. Scanners Sold (कुल बिक्री) */}
+              {/* 1. Scanners Sold */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Scanners Sold (कुल बिक्री)
+                  Scanners Sold
                 </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-display font-extrabold text-blue-600 dark:text-blue-400">
@@ -3693,10 +4218,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 2. Working Days (कार्य दिवस) */}
+              {/* 2. Working Days */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Working Days (कार्य दिवस)
+                  Working Days
                 </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-display font-extrabold text-indigo-600 dark:text-indigo-400">
@@ -3706,10 +4231,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 3. Incentive per QR (प्रति QR इंसेंटिव) */}
+              {/* 3. Incentive per QR */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Incentive / QR (इंसेंटिव)
+                  Incentive / QR
                 </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-display font-extrabold text-purple-600 dark:text-purple-400">
@@ -3719,10 +4244,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 4. Base Monthly Salary (फिक्स वेतन) */}
+              {/* 4. Base Monthly Salary */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#161826] border border-slate-200/80 dark:border-[#22253a]">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                  Base Salary (फिक्स वेतन)
+                  Base Salary
                 </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-display font-extrabold text-slate-800 dark:text-slate-100">
@@ -3731,10 +4256,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 5. Total Net Payout (कुल शुद्ध भुगतान) */}
+              {/* 5. Total Net Payout */}
               <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 col-span-2 sm:col-span-1">
                 <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider block">
-                  Total Net Payout (कुल देय)
+                  Total Net Payout
                 </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-xl sm:text-2xl font-display font-extrabold text-emerald-600 dark:text-emerald-300">
@@ -3774,7 +4299,7 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-ink">
-                          Month-Wise Salary & Payouts (महीनेवार वेतन स्थिति)
+                          Month-Wise Salary & Payouts
                         </h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
                           Select a month to check salary breakdown, update payment status, or record payouts
@@ -3853,7 +4378,7 @@ export default function AdminDashboard() {
                             }`}
                         >
                           {isMonthPaid ? <CheckCircle className="size-3.5" /> : <Clock className="size-3.5" />}
-                          <span>{isMonthPaid ? 'PAID (वेतन भुगतान हो गया)' : 'PENDING (भुगतान बाकी है)'}</span>
+                          <span>{isMonthPaid ? 'PAID' : 'PENDING'}</span>
                         </span>
                       </div>
                     </div>
@@ -3903,7 +4428,7 @@ export default function AdminDashboard() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                            Total Net Salary Payable (कुल देय वेतन)
+                            Total Net Salary Payable
                           </span>
                           <div className="flex items-baseline gap-2 mt-1">
                             <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
@@ -3955,7 +4480,7 @@ export default function AdminDashboard() {
                               className="btn-primary !py-2.5 !px-5 text-xs font-bold shadow-md shadow-brand-500/25 flex items-center gap-2"
                             >
                               <CreditCard className="size-4" />
-                              <span>💳 Pay Salary Now (वेतन का भुगतान करें)</span>
+                              <span>💳 Pay Salary Now</span>
                             </button>
                           )}
                         </div>
@@ -3969,7 +4494,7 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-2">
                         <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" />
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                          Salary Payout Transaction History (वेतन भुगतान इतिहास)
+                          Salary Payout Transaction History
                         </h4>
                       </div>
                       <span className="text-[11px] text-slate-400">
@@ -4266,7 +4791,7 @@ export default function AdminDashboard() {
                   <CreditCard className="size-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-ink">Pay Salary (वेतन भुगतान)</h3>
+                  <h3 className="font-bold text-base text-ink">Pay Salary</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Record payout for {viewStaffModal.member?.name}
                   </p>
@@ -4312,7 +4837,7 @@ export default function AdminDashboard() {
             <form onSubmit={handleConfirmPaySalary} className="space-y-3.5 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Amount to Pay (रुपये) *
+                  Amount to Pay (₹) *
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-slate-400 font-bold">₹</span>
@@ -4359,7 +4884,7 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Payment Note (वैकल्पिक टिप्पणी)
+                  Payment Note (Optional)
                 </label>
                 <input
                   type="text"

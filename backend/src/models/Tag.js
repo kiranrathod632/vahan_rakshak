@@ -83,7 +83,7 @@ const TagSchema = new mongoose.Schema({
     },
     amountPaid: {
       type: Number,
-      default: 299 // Default INR cost of smart sticker
+      default: 499 // Default INR cost of smart sticker
     },
     purchasedAt: {
       type: Date,

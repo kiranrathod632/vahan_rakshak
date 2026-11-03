@@ -173,7 +173,7 @@ export default function Purchase() {
                   <span className="text-xs font-bold uppercase tracking-wider text-brand-700 dark:text-cyan-400 bg-brand-50 dark:bg-brand-950/60 px-2.5 py-1 rounded-md border border-brand-200 dark:border-brand-900/60">
                     Single Sticker
                   </span>
-                  <span className="text-2xl font-black font-display text-ink dark:text-white">₹299 <span className="text-xs font-normal text-slate-500 dark:text-slate-400">/year</span></span>
+                  <span className="text-2xl font-black font-display text-ink dark:text-white">₹499 <span className="text-xs font-normal text-slate-500 dark:text-slate-400">/year</span></span>
                 </div>
 
                 <h3 className="mt-4 font-bold text-lg text-ink dark:text-white">1 Weatherproof QR Sticker</h3>
@@ -209,7 +209,7 @@ export default function Purchase() {
                 type="button"
                 className={`mt-6 w-full ${selectedPlan === 'single' ? 'btn-primary' : 'btn-secondary'} text-xs font-bold`}
               >
-                {selectedPlan === 'single' ? '✓ Plan Selected' : 'Select Single Plan (₹299)'}
+                {selectedPlan === 'single' ? '✓ Plan Selected' : 'Select Single Plan (₹499)'}
               </button>
             </div>
 
@@ -340,7 +340,7 @@ export default function Purchase() {
                 >
                   <ShoppingBag className="size-4" />
                   <span>
-                    {loading ? 'Generating Scanners...' : `Complete Order & Buy Now (${selectedPlan === 'single' ? '₹299' : '₹699'})`}
+                    {loading ? 'Generating Scanners...' : `Complete Order & Buy Now (${selectedPlan === 'single' ? '₹499' : '₹699'})`}
                   </span>
                 </button>
               </div>

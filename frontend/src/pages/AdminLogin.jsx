@@ -155,19 +155,8 @@ export default function AdminLogin() {
             </button>
           </form>
 
-          <div className="pt-3 border-t border-slate-100 dark:border-[#1f2333] text-center text-xs text-slate-500 dark:text-slate-400 space-y-1.5">
-            <div>
-              Looking for Customer / Vehicle Owner Login?{' '}
-              <Link to="/login" className="font-bold text-brand-600 dark:text-brand-400 hover:underline">
-                User Sign In
-              </Link>
-            </div>
-            <div>
-              Sales Representative?{' '}
-              <Link to="/sales" className="font-bold text-brand-600 dark:text-brand-400 hover:underline">
-                Sales Portal
-              </Link>
-            </div>
+          <div className="pt-3 border-t border-slate-100 dark:border-[#1f2333] text-center text-xs text-slate-500 dark:text-slate-400">
+            <span>Official GadiRaksha Master Administration Control Panel</span>
           </div>
         </div>
       </div>

@@ -161,24 +161,6 @@ export default function Login() {
                 Activate Sticker
               </Link>
             </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <Link
-                to="/sales"
-                className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-slate-100 dark:bg-[#161826] hover:bg-slate-200 dark:hover:bg-[#1f2333] text-slate-700 dark:text-slate-300 text-[11px] font-semibold border border-slate-200/80 dark:border-[#22253a] transition"
-              >
-                <Briefcase className="size-3.5 text-brand-600 dark:text-cyan-400" />
-                <span>Sales Staff Portal</span>
-              </Link>
-
-              <Link
-                to="/admin/login"
-                className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-slate-100 dark:bg-[#161826] hover:bg-slate-200 dark:hover:bg-[#1f2333] text-slate-700 dark:text-slate-300 text-[11px] font-semibold border border-slate-200/80 dark:border-[#22253a] transition"
-              >
-                <KeyRound className="size-3.5 text-amber-500" />
-                <span>Admin Console</span>
-              </Link>
-            </div>
           </div>
         </div>
       </div>

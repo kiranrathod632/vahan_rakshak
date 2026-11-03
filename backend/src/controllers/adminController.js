@@ -42,7 +42,7 @@ const getAdminStats = async (req, res, next) => {
 
     // Calculate revenue from paid tags
     const paidTags = await Tag.find({ 'purchaseInfo.isPaid': true }, 'purchaseInfo.amountPaid');
-    const totalRevenue = paidTags.reduce((sum, t) => sum + (t.purchaseInfo?.amountPaid || 299), 0);
+    const totalRevenue = paidTags.reduce((sum, t) => sum + (t.purchaseInfo?.amountPaid || 499), 0);
 
     // Vehicle breakdown by type
     const [twoWheelers, fourWheelers, commercial] = await Promise.all([
@@ -838,7 +838,7 @@ const getAllOrders = async (req, res, next) => {
       .sort({ 'purchaseInfo.purchasedAt': -1 });
 
     const totalRevenue = tagsWithPurchase.reduce(
-      (sum, t) => sum + (t.purchaseInfo?.amountPaid || 299),
+      (sum, t) => sum + (t.purchaseInfo?.amountPaid || 499),
       0
     );
 
@@ -847,7 +847,7 @@ const getAllOrders = async (req, res, next) => {
       tagCode: t.tagCode,
       user: t.user,
       plan: t.purchaseInfo?.plan || '1_YEAR_STANDARD',
-      amount: t.purchaseInfo?.amountPaid || 299,
+      amount: t.purchaseInfo?.amountPaid || 499,
       paymentStatus: t.purchaseInfo?.paymentStatus || 'PAID',
       purchasedAt: t.purchaseInfo?.purchasedAt || t.claimedAt,
       validUntil: t.purchaseInfo?.validUntil
@@ -1528,20 +1528,20 @@ const getTeamPerformance = async (req, res, next) => {
         if (timeframe === 'daily') {
           stickersSold = (idx % 3 === 0) ? 4 : (idx % 2 === 0) ? 6 : 2;
           usersOnboarded = Math.max(1, stickersSold - 1);
-          revenueGenerated = stickersSold * 299;
+          revenueGenerated = stickersSold * 499;
           hoursWorked = 7.5;
           leadsContacted = stickersSold * 3;
         } else if (timeframe === 'weekly') {
           stickersSold = (idx % 3 === 0) ? 22 : (idx % 2 === 0) ? 31 : 16;
           usersOnboarded = Math.max(5, stickersSold - 3);
-          revenueGenerated = stickersSold * 299;
+          revenueGenerated = stickersSold * 499;
           hoursWorked = 38;
           leadsContacted = stickersSold * 4;
         } else {
           // monthly
           stickersSold = (idx % 3 === 0) ? 58 : (idx % 2 === 0) ? 84 : 42;
           usersOnboarded = Math.max(15, stickersSold - 6);
-          revenueGenerated = stickersSold * 299;
+          revenueGenerated = stickersSold * 499;
           hoursWorked = 160;
           leadsContacted = stickersSold * 5;
         }

@@ -30,6 +30,35 @@ import Home from './pages/Home';
 import ActivateWizard from './pages/ActivateWizard';
 
 /**
+ * Dedicated Website Domain Detector:
+ * - Admin Website: Matches domains containing 'admin' (e.g. vahan-rakshak-admin-omega.vercel.app, admin.domain.com)
+ * - Sales Website: Matches domains containing 'sales' (e.g. vahan-rakshak-sales-omega.vercel.app, sales.domain.com)
+ * - User Website: Default (e.g. vahan-rakshak-omega.vercel.app, localhost)
+ */
+const getPortalMode = () => {
+  if (typeof window === 'undefined') return 'default';
+  const hostname = window.location.hostname.toLowerCase();
+
+  // URL query parameter takes priority for testing on localhost: e.g. ?portal=admin or ?portal=sales
+  const searchParams = new URLSearchParams(window.location.search);
+  const portalParam = searchParams.get('portal');
+  if (portalParam === 'admin') return 'admin';
+  if (portalParam === 'sales') return 'sales';
+
+  // Dedicated Admin Website Domain
+  if (hostname.includes('admin')) {
+    return 'admin';
+  }
+
+  // Dedicated Sales Staff Website Domain
+  if (hostname.includes('sales')) {
+    return 'sales';
+  }
+
+  return 'default';
+};
+
+/**
  * Main App Layout with Sidebar, Topbar Navbar, and Live Emergency Alert Banner
  */
 function AppLayout() {
@@ -59,62 +88,99 @@ function AppLayout() {
 }
 
 export default function App() {
+  const portalMode = getPortalMode();
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <SocketProvider>
           <BrowserRouter>
-            <Routes>
-            {/* Landing page matching vehicle-qr-scanner.netlify.app */}
-            <Route path="/" element={<Home />} />
+            {/* 
+              ========================================================================
+              1. DEDICATED ADMIN WEBSITE (https://vahan-rakshak-admin-omega.vercel.app)
+              Only Admin Login & Master Control Center. Pure admin website.
+              ========================================================================
+            */}
+            {portalMode === 'admin' && (
+              <Routes>
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/login" element={<AdminLogin />} />
+                <Route path="/" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
+                <Route path="/admin" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            )}
 
-            {/* Step-by-Step Signup & Pre-Printed Scanner Activation Wizard */}
-            <Route path="/activate" element={<ActivateWizard />} />
-            <Route path="/signup" element={<Register />} />
-            <Route path="/register" element={<Register />} />
+            {/* 
+              ========================================================================
+              2. DEDICATED SALES WEBSITE (https://vahan-rakshak-sales-omega.vercel.app)
+              Only Sales Staff Login & Field Portal. Pure sales website.
+              ========================================================================
+            */}
+            {portalMode === 'sales' && (
+              <Routes>
+                <Route path="/" element={<SalesDashboard />} />
+                <Route path="/sales" element={<SalesDashboard />} />
+                <Route path="/sales/login" element={<SalesDashboard />} />
+                <Route path="/login" element={<SalesDashboard />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            )}
 
-            {/* Public Scan endpoints accessed by bystanders */}
-            <Route path="/scan/:tagCode" element={<PublicScan />} />
-            <Route path="/s/:tagCode" element={<PublicScan />} />
+            {/* 
+              ========================================================================
+              3. DEDICATED CUSTOMER & USER WEBSITE (https://vahan-rakshak-omega.vercel.app)
+              Only Vehicle Owner features: Home, Register, User Login, Scan, Garage.
+              No Admin or Sales links displayed!
+              ========================================================================
+            */}
+            {portalMode === 'default' && (
+              <Routes>
+                {/* User Landing page */}
+                <Route path="/" element={<Home />} />
 
-            {/* Authentication */}
-            <Route path="/login" element={<Login />} />
+                {/* Step-by-Step Signup & Pre-Printed Scanner Activation Wizard */}
+                <Route path="/activate" element={<ActivateWizard />} />
+                <Route path="/signup" element={<Register />} />
+                <Route path="/register" element={<Register />} />
 
-            {/* Sales Team Dedicated Portal */}
-            <Route path="/sales" element={<SalesDashboard />} />
-            <Route path="/sales/login" element={<SalesDashboard />} />
-            <Route path="/team" element={<Navigate to="/sales" replace />} />
+                {/* Public Scan endpoints accessed by bystanders */}
+                <Route path="/scan/:tagCode" element={<PublicScan />} />
+                <Route path="/s/:tagCode" element={<PublicScan />} />
 
-            {/* Dedicated Admin Portal Authentication */}
-            <Route path="/admin/login" element={<AdminLogin />} />
+                {/* Customer Login (Clean - No Admin/Sales buttons) */}
+                <Route path="/login" element={<Login />} />
 
-            {/* Admin Master Control Center (Isolated Admin Layout with dedicated AdminSidebar) */}
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-            </Route>
+                {/* Direct routes for sales/admin when testing on main domain */}
+                <Route path="/sales" element={<SalesDashboard />} />
+                <Route path="/sales/login" element={<SalesDashboard />} />
+                <Route path="/team" element={<Navigate to="/sales" replace />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
 
-            {/* User Dashboard & Subpages */}
-            <Route path="/app" element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="vehicles" element={<Vehicles />} />
-              <Route path="scanners" element={<Scanners />} />
-              <Route path="documents" element={<Documents />} />
-              <Route path="family" element={<FamilyContacts />} />
-              <Route path="scan-history" element={<ScanHistory />} />
-              <Route path="emergencies" element={<Emergencies />} />
-              <Route path="notifications" element={<Notifications />} />
-              <Route path="purchase" element={<Purchase />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="admin" element={<Navigate to="/admin" replace />} />
-            </Route>
+                {/* ================= CUSTOMER USER GARAGE DASHBOARD ================= */}
+                <Route path="/app" element={<AppLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="vehicles" element={<Vehicles />} />
+                  <Route path="scanners" element={<Scanners />} />
+                  <Route path="documents" element={<Documents />} />
+                  <Route path="family" element={<FamilyContacts />} />
+                  <Route path="scan-history" element={<ScanHistory />} />
+                  <Route path="emergencies" element={<Emergencies />} />
+                  <Route path="notifications" element={<Notifications />} />
+                  <Route path="purchase" element={<Purchase />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="admin" element={<Navigate to="/admin" replace />} />
+                </Route>
 
-            {/* Catch-all fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </SocketProvider>
-    </AuthProvider>
-  </ThemeProvider>
+                {/* Catch-all fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            )}
+          </BrowserRouter>
+        </SocketProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

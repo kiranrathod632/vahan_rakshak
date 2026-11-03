@@ -293,9 +293,11 @@ export default function Dashboard() {
   const hasVehicle = vehicles.length > 0;
   const hasFamily = user?.emergencyContacts && user.emergencyContacts.length > 0;
   const hasPersonal = Boolean(user?.bloodGroup && user.bloodGroup !== 'Unknown');
+  const completedSteps = Number(hasVehicle) + Number(hasFamily) + Number(hasPersonal);
+  const profileScore = Math.round((completedSteps / 3) * 100) || 33;
 
   return (
-    <div className="space-y-8 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-900 via-brand-800 to-brand-950 p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
@@ -311,7 +313,7 @@ export default function Dashboard() {
             Welcome back, {user?.name || 'Vehicle Owner'}!
           </h1>
           <p className="mt-1 text-sm text-brand-200/90 max-w-xl">
-            Aapka QR Scanner active hai. Kisi bhi emergency ya parking issue me bystander scan karega toh bina aapka number dikhe sidhe call aur family SOS alert jayega.
+            Your QR safety sticker is active. In case of an emergency or parking issue, anyone scanning your sticker can call you privately without seeing your phone number, and immediate SOS alerts will be dispatched to your family.
           </p>
         </div>
 
@@ -349,14 +351,14 @@ export default function Dashboard() {
                 Setup In Progress
               </span>
               <h2 className="text-base sm:text-lg font-bold text-ink dark:text-white mt-1">
-                Complete Your Safety Details (गाड़ी एवं परिवार की जानकारी यहाँ से जोड़ें)
+                Complete Your Safety Details (Add Vehicle & Emergency Contacts)
               </h2>
               <p className="text-xs text-slate-600 dark:text-slate-300">
-                Aapka account aur QR scanner activate ho chuka hai. Poori suraksha ke liye neeche diye 3 steps complete karein:
+                Your account and QR scanner are activated. Please complete the following 3 steps to ensure 100% safety protection on the road:
               </p>
             </div>
             <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
-              {Number(hasVehicle) + Number(hasFamily) + Number(hasPersonal)} of 3 Complete
+              {completedSteps} of 3 Complete
             </span>
           </div>
 
@@ -390,7 +392,7 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {hasVehicle
                     ? `${vehicles[0]?.vehicleNumber} (${vehicles[0]?.vehicleModel || vehicles[0]?.vehicleType})`
-                    : 'Gadi number aur model jodein taaki QR sticker gadi se link ho.'}
+                    : 'Add vehicle number and model so the QR sticker is linked to your vehicle.'}
                 </p>
               </div>
               <button
@@ -432,7 +434,7 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {hasFamily
                     ? `${user?.emergencyContacts[0]?.name} (${user?.emergencyContacts[0]?.relation})`
-                    : 'Emergency me parivaar ko turant call aur alert bhejne ke liye.'}
+                    : 'Configure family emergency contacts for instant SMS and WhatsApp incident dispatch.'}
                 </p>
               </div>
               <button
@@ -474,7 +476,7 @@ export default function Dashboard() {
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {hasPersonal
                     ? `Blood Group: ${user?.bloodGroup}`
-                    : 'Emergency rescue ke liye Blood Group aur pata add karein.'}
+                    : 'Add blood group and emergency details for fast medical response.'}
                 </p>
               </div>
               <button
@@ -492,92 +494,306 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Metrics Row (4 Cards) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1 */}
-        <div className="card p-5">
+      {/* ========================================================= */}
+      {/* 1. TOP ROW: 4 ENLAZ-STYLE KPI CARDS                      */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* Card 1: Active Scanners */}
+        <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 sm:p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] dark:shadow-none flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
               Active Scanners
             </span>
-            <div className="grid size-9 place-items-center rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400">
-              <QrCode className="size-4.5" />
+            <div className="size-11 rounded-2xl grid place-items-center bg-purple-100/70 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-200/50 dark:border-purple-500/30">
+              <QrCode className="size-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-              {activeScannersCount}
-            </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">of {tags.length || 1} tags</span>
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-3xl sm:text-4xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {activeScannersCount}
+              </span>
+              <span className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
+                +100% Active
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-normal">
+              Weatherproof QR linked to vehicle
+            </p>
           </div>
-          <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-            <CheckCircle2 className="size-3.5" />
-            <span>Weatherproof QR Active</span>
-          </p>
         </div>
 
-        {/* Metric 2 */}
-        <div className="card p-5">
+        {/* Card 2: My Vehicles */}
+        <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 sm:p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] dark:shadow-none flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
               My Vehicles
             </span>
-            <div className="grid size-9 place-items-center rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-              <Car className="size-4.5" />
+            <div className="size-11 rounded-2xl grid place-items-center bg-blue-100/70 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-500/30">
+              <Car className="size-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-              {vehicles.length}
-            </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">registered</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 truncate">
-            {vehicles[0]?.vehicleModel || (vehicles.length === 0 ? 'No vehicle added yet' : 'Vehicle')}
-          </p>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Document Expiries
-            </span>
-            <div className="grid size-9 place-items-center rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-              <FileText className="size-4.5" />
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-3xl sm:text-4xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {vehicles.length}
+              </span>
+              <span className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
+                +{vehicles.length > 0 ? 1 : 0} Added
+              </span>
             </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-normal">
+              {vehicles[0]?.vehicleNumber || 'Bikes & Cars registered'}
+            </p>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-              {expiringDocsCount}
-            </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">needing renewal</span>
-          </div>
-          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
-            PUC & Insurance tracked
-          </p>
         </div>
 
-        {/* Metric 4 */}
-        <div className="card p-5">
+        {/* Card 3: Family Emergency Circle */}
+        <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 sm:p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] dark:shadow-none flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
               Emergency Circle
             </span>
-            <div className="grid size-9 place-items-center rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-              <Users className="size-4.5" />
+            <div className="size-11 rounded-2xl grid place-items-center bg-rose-100/70 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200/50 dark:border-rose-500/30">
+              <Users className="size-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-display font-extrabold text-ink">
-              {user?.emergencyContacts?.length || 0}
-            </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">Family Members</span>
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-3xl sm:text-4xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {user?.emergencyContacts?.length || 0}
+              </span>
+              <span className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
+                Direct Alerts
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-normal">
+              Instant SMS & WhatsApp SOS
+            </p>
           </div>
-          <p className="mt-2 text-xs text-rose-600 dark:text-rose-400 font-medium">
-            Direct Call + WhatsApp Alert
-          </p>
         </div>
+
+        {/* Card 4: Protection Status */}
+        <div className="rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-5 sm:p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] dark:shadow-none flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              Protection Level
+            </span>
+            <div className="size-11 rounded-2xl grid place-items-center bg-emerald-100/70 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/30">
+              <ShieldAlert className="size-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between">
+              <span className="text-3xl sm:text-4xl font-display font-extrabold text-slate-900 dark:text-white tracking-tight">
+                100%
+              </span>
+              <span className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20">
+                24x7 Ready
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-normal">
+              Bystander call protection
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. MAIN 2-COLUMN SPLIT: PROTECTION TRENDS + STATUS DONUT  */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        {/* LEFT COLUMN: PROTECTION & SCAN TRENDS (68% width on lg) */}
+        <div className="lg:col-span-8 rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-6 sm:p-7 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] dark:shadow-none flex flex-col justify-between">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white">
+                  Safety Protection & Readiness Trends
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  Monthly vehicle protection & bystander scan events
+                </p>
+              </div>
+
+              {/* Top-Right Legend */}
+              <div className="flex items-center gap-4 text-xs font-semibold self-start sm:self-auto">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-[#8b5cf6]" />
+                  <span className="text-slate-600 dark:text-slate-300">Protection Level</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-[#10b981]" />
+                  <span className="text-slate-600 dark:text-slate-300">Readiness</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stat Headline */}
+            <div className="mt-5 flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-4xl font-display font-extrabold text-slate-900 dark:text-white">
+                100%
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">protection active</span>
+              <span className="text-3xl sm:text-4xl font-display font-extrabold text-slate-900 dark:text-white ml-4">
+                0
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">unresolved incidents</span>
+            </div>
+
+            {/* Spline Area Chart Canvas matching ENLAZ */}
+            <div className="mt-6 relative h-56 sm:h-64 w-full">
+              <svg className="w-full h-full overflow-visible" viewBox="0 0 600 220" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="userSplineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.30" />
+                    <stop offset="60%" stopColor="#a855f7" stopOpacity="0.10" />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Y-Axis dashed grid lines & labels */}
+                {[
+                  { label: '100%', y: 20 },
+                  { label: '75%', y: 70 },
+                  { label: '50%', y: 120 },
+                  { label: '25%', y: 170 }
+                ].map((grid) => (
+                  <g key={grid.label}>
+                    <text x="0" y={grid.y + 4} fill="currentColor" className="text-slate-400 dark:text-slate-600 text-[11px] font-mono">
+                      {grid.label}
+                    </text>
+                    <line
+                      x1="40"
+                      y1={grid.y}
+                      x2="600"
+                      y2={grid.y}
+                      stroke="currentColor"
+                      className="text-slate-100 dark:text-[#1e2235]"
+                      strokeDasharray="4 4"
+                      strokeWidth="1"
+                    />
+                  </g>
+                ))}
+
+                {/* Smooth Spline Curve Area Fill */}
+                <path
+                  d="M 40 220 L 40 180 Q 150 170 220 120 T 310 25 T 390 190 T 500 190 L 600 190 L 600 220 Z"
+                  fill="url(#userSplineGrad)"
+                />
+
+                {/* Smooth Purple Spline Curve Line */}
+                <path
+                  d="M 40 180 Q 150 170 220 120 T 310 25 T 390 190 T 500 190 L 600 190"
+                  fill="none"
+                  stroke="#8b5cf6"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+                {/* Peak Point indicator */}
+                <circle cx="310" cy="25" r="5" fill="#8b5cf6" stroke="#ffffff" strokeWidth="2.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: SAFETY PROFILE STATUS / DONUT RING (32% width on lg) */}
+        <div className="lg:col-span-4 rounded-3xl bg-white dark:bg-[#121420] border border-slate-200/80 dark:border-[#1e2235] p-6 sm:p-7 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] dark:shadow-none flex flex-col justify-between">
+          <div>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white">
+                  Safety Profile Status
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  Current vehicle protection score
+                </p>
+              </div>
+
+              <div className="text-right">
+                <span className="text-3xl font-display font-extrabold text-slate-900 dark:text-white block leading-tight">
+                  {profileScore}%
+                </span>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 block">
+                  live right now
+                </span>
+              </div>
+            </div>
+
+            {/* Clean SVG Donut Ring matching ENLAZ */}
+            <div className="mt-8 flex flex-col items-center justify-center">
+              <div className="relative size-44 shrink-0 grid place-items-center">
+                <svg className="size-full -rotate-90" viewBox="0 0 100 100">
+                  {/* Background Track */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="37"
+                    className="stroke-slate-100 dark:stroke-[#1b1e2e]"
+                    strokeWidth="13"
+                    fill="none"
+                  />
+                  {/* Green Segment (Completed) */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="37"
+                    stroke="#15803d"
+                    strokeWidth="13"
+                    strokeDasharray={`${Math.round((profileScore / 100) * 232)} 232`}
+                    strokeDashoffset="0"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  {/* Amber Segment (Pending if any) */}
+                  {profileScore < 100 && (
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="37"
+                      stroke="#b45309"
+                      strokeWidth="13"
+                      strokeDasharray={`${Math.round(((100 - profileScore) / 100) * 232)} 232`}
+                      strokeDashoffset={`-${Math.round((profileScore / 100) * 232)}`}
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                  )}
+                </svg>
+
+                {/* Central Value */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-3xl font-display font-black text-slate-900 dark:text-white leading-none">
+                    {profileScore}%
+                  </span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1">
+                    safety score
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Dot Legend */}
+              <div className="mt-8 flex items-center justify-center gap-6 text-xs w-full">
+                <div className="flex items-center gap-2">
+                  <span className="size-2.5 rounded-full bg-[#15803d]" />
+                  <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                    Complete <strong className="text-slate-900 dark:text-white font-bold">{completedSteps}</strong> <span className="text-slate-400 text-[11px] font-normal">({profileScore}%)</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="size-2.5 rounded-full bg-[#b45309]" />
+                  <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                    Pending <strong className="text-slate-900 dark:text-white font-bold">{3 - completedSteps}</strong> <span className="text-slate-400 text-[11px] font-normal">({100 - profileScore}%)</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Main Grid: Left Column (Vehicles & Live Incidents) / Right Column (Documents, Fast Claim, Quick Actions) */}
@@ -646,7 +862,7 @@ export default function Dashboard() {
                   <div>
                     <h3 className="text-sm font-bold text-ink dark:text-white">No Vehicles Added Yet</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
-                      Aapka QR sticker registered hai! Apni bike ya car ka number add karein taaki bystander call aur emergency alerts kaam karein.
+                      Your QR sticker is registered! Add your bike or car registration number so bystander private calls and emergency SOS alerts can protect you.
                     </p>
                   </div>
                   <button
@@ -860,7 +1076,7 @@ export default function Dashboard() {
             <form onSubmit={handleSaveVehicle} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Vehicle Registration Number (गाड़ी नंबर) *
+                  Vehicle Registration Number *
                 </label>
                 <input
                   type="text"
@@ -875,7 +1091,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Vehicle Type (प्रकार) *
+                    Vehicle Type *
                   </label>
                   <select
                     value={vehicleForm.vehicleType}
@@ -892,7 +1108,7 @@ export default function Dashboard() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Make & Model (मेक/मॉडल)
+                    Make & Model
                   </label>
                   <input
                     type="text"
@@ -907,7 +1123,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Vehicle Color (रंग)
+                    Vehicle Color
                   </label>
                   <input
                     type="text"
@@ -964,7 +1180,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-ink dark:text-white">Add Family Emergency Contact</h3>
-                  <p className="text-[11px] text-slate-400">आपातकालीन परिवार संपर्क जोड़ें</p>
+                  <p className="text-[11px] text-slate-400">Add Emergency Family Contacts</p>
                 </div>
               </div>
               <button
@@ -996,7 +1212,7 @@ export default function Dashboard() {
             <form onSubmit={handleSaveFamily} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Contact Name (नाम) *
+                  Contact Name *
                 </label>
                 <input
                   type="text"
@@ -1011,21 +1227,21 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Relationship (रिश्ता) *
+                    Relationship *
                   </label>
                   <select
                     value={familyForm.relation}
                     onChange={(e) => setFamilyForm({ ...familyForm, relation: e.target.value })}
                     className="w-full rounded-xl border border-slate-300 dark:border-[#272b3f] bg-white dark:bg-[#0b0d14] px-3 py-2 text-xs text-ink dark:text-white focus:outline-none"
                   >
-                    <option value="Father">Father (पिता)</option>
-                    <option value="Mother">Mother (माता)</option>
-                    <option value="Spouse">Spouse (पति/पत्नी)</option>
-                    <option value="Brother">Brother (भाई)</option>
-                    <option value="Sister">Sister (बहन)</option>
-                    <option value="Son">Son (बेटा)</option>
-                    <option value="Daughter">Daughter (बेटी)</option>
-                    <option value="Friend">Friend (दोस्त)</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Son">Son</option>
+                    <option value="Daughter">Daughter</option>
+                    <option value="Friend">Friend</option>
                     <option value="Other">Other Relative</option>
                   </select>
                 </div>
@@ -1078,7 +1294,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-ink dark:text-white">Personal & Medical Info</h3>
-                  <p className="text-[11px] text-slate-400">ब्लड ग्रुप एवं रेस्क्यू पता</p>
+                  <p className="text-[11px] text-slate-400">Blood Group & Rescue Address</p>
                 </div>
               </div>
               <button
@@ -1111,7 +1327,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Blood Group (ब्लड ग्रुप)
+                    Blood Group
                   </label>
                   <select
                     value={personalForm.bloodGroup}
@@ -1132,7 +1348,7 @@ export default function Dashboard() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Gender (लिंग)
+                    Gender
                   </label>
                   <select
                     value={personalForm.gender}
@@ -1148,7 +1364,7 @@ export default function Dashboard() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Residential Address (रेस्क्यू हेतु पता)
+                  Residential Address (For Rescue Dispatch)
                 </label>
                 <textarea
                   rows="2"

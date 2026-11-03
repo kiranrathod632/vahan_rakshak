@@ -5,9 +5,10 @@ import AdminSidebar from './AdminSidebar';
 import AdminNavbar from './AdminNavbar';
 import EmergencyAlertModal from './EmergencyAlertModal';
 
-export default function AdminLayout() {
+export default function AdminLayout({ children }) {
   const { user, token, loading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
   if (loading) {
@@ -35,6 +36,8 @@ export default function AdminLayout() {
       <AdminSidebar
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed(prev => !prev)}
       />
 
       {/* Main Content Area */}
@@ -42,7 +45,7 @@ export default function AdminLayout() {
         <AdminNavbar onOpenMobileMenu={() => setMobileMenuOpen(true)} />
 
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          {children ? children : <Outlet />}
         </main>
       </div>
     </div>

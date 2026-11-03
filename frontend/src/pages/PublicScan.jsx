@@ -524,7 +524,7 @@ export default function PublicScan() {
           {/* Action Alert Selection Grid */}
           <div className="space-y-2.5 pt-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-              Choose Reason for Scanning (अलर्ट प्रकार निवडा):
+              Choose Reason for Scanning:
             </span>
 
             {/* Option 1: No Parking / Gaadi Hatao */}
@@ -540,7 +540,7 @@ export default function PublicScan() {
                 </div>
                 <div>
                   <div className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-300">
-                    गाडी नो-पार्किंगमध्ये आहे (No Parking Alert)
+                    Vehicle in No-Parking Zone (Alert Owner)
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
                     Vehicle Obstructing / Please Move Car/Bike
@@ -566,7 +566,7 @@ export default function PublicScan() {
                 </div>
                 <div>
                   <div className="text-xs sm:text-sm font-extrabold text-rose-700 dark:text-rose-300">
-                    अपघात / आणीबाणी (Accident SOS Emergency)
+                    Accident / Medical Emergency SOS
                   </div>
                   <p className="text-[11px] text-rose-600 dark:text-rose-200 mt-0.5 font-medium">
                     Critical Road Incident / Urgent Medical Help
@@ -592,7 +592,7 @@ export default function PublicScan() {
                 </div>
                 <div>
                   <div className="text-xs sm:text-sm font-bold text-sky-900 dark:text-sky-300">
-                    लाईट चालू / खिडकी उघडी / टायर पंचर (Vehicle Issue)
+                    Headlights On / Window Open / Flat Tire
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
                     Headlights left ON, flat tyre, or window rolled down
@@ -618,7 +618,7 @@ export default function PublicScan() {
                 </div>
                 <div>
                   <div className="text-xs sm:text-sm font-bold text-red-900 dark:text-red-300">
-                    टोईंग क्रेन / पोलीस कारवाई (Towing Alert)
+                    Towing Crane / Police Action Alert
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
                     Traffic police crane is towing this vehicle
@@ -635,7 +635,7 @@ export default function PublicScan() {
           {/* Quick Direct Call & WhatsApp Action Row */}
           <div className="pt-2 border-t border-slate-100 dark:border-[#1f2333] space-y-2">
             <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block text-center">
-              Direct Contact Options (थेट संपर्क साधा):
+              Direct Contact Options:
             </span>
             <div className="grid grid-cols-2 gap-2.5">
               <a

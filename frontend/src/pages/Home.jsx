@@ -440,7 +440,7 @@ export default function Home() {
                     Single Vehicle
                   </span>
                   <div className="text-right">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">₹299</span>
+                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">₹499</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-medium"> / year</span>
                   </div>
                 </div>
@@ -623,8 +623,8 @@ export default function Home() {
 
           <div className="flex flex-wrap items-center justify-center gap-4 font-semibold text-slate-700 dark:text-slate-300">
             <Link to="/activate" className="hover:text-blue-600 dark:hover:text-cyan-400">Activate Sticker</Link>
-            <Link to="/login" className="hover:text-blue-600 dark:hover:text-cyan-400">User Dashboard</Link>
-            <Link to="/admin" className="hover:text-blue-600 dark:hover:text-cyan-400">Admin Portal</Link>
+            <Link to="/register" className="hover:text-blue-600 dark:hover:text-cyan-400">Register Vehicle</Link>
+            <Link to="/login" className="hover:text-blue-600 dark:hover:text-cyan-400">Vehicle Owner Login</Link>
           </div>
         </div>
       </footer>

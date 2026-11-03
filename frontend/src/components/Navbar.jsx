@@ -54,7 +54,7 @@ export default function Navbar({ onOpenMobileMenu }) {
           {/* Quick bystander scan simulator */}
           <button
             onClick={() => setShowQuickModal(true)}
-            className="btn-secondary !py-1.5 !px-3 text-xs"
+            className="btn-secondary !py-1.5 !px-3 text-xs hidden md:inline-flex items-center gap-1.5"
           >
             <QrCode className="size-3.5 text-brand-600 dark:text-cyan-400" />
             <span>Test QR Scan</span>
@@ -64,7 +64,7 @@ export default function Navbar({ onOpenMobileMenu }) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1a1c27] border border-slate-200 dark:border-[#1f2333] transition"
+            className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1a1c27] border border-slate-200 dark:border-[#1f2333] transition"
             title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
           >
             {isDark ? <Sun className="size-4 text-amber-400" /> : <Moon className="size-4 text-indigo-600" />}
@@ -72,7 +72,7 @@ export default function Navbar({ onOpenMobileMenu }) {
 
           <button
             onClick={() => navigate('/app/purchase')}
-            className="btn-primary !py-1.5 !px-3 text-xs"
+            className="btn-primary !py-1.5 !px-3 text-xs hidden sm:inline-flex items-center gap-1"
           >
             + Get Sticker
           </button>
